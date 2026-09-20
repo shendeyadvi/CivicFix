@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark light;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  
+  html.dark body {
+    background-color: #081220;
+    color: #F1F5F9;
+  }
+
+  html.light body {
+    background-color: #F8FAFC;
+    color: #0F172A;
+  }
+}
+
+/* Custom modern subtle scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #081220;
+}
+.light ::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #162846;
+  border-radius: 4px;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0D9488;
+}
+
+/* Subtle Civic Grid & Map Background patterns */
+.dark .civic-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(22, 40, 70, 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22, 40, 70, 0.25) 1px, transparent 1px);
+}
+
+.light .civic-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(148, 163, 184, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.2) 1px, transparent 1px);
+}
+
+.dark .civic-dots {
+  background-image: radial-gradient(rgba(20, 184, 166, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.light .civic-dots {
+  background-image: radial-gradient(rgba(13, 148, 136, 0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .glow-teal-radial {
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.18) 0%, rgba(8, 18, 32, 0) 70%);
+}
+
+.light .glow-teal-radial {
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.12) 0%, rgba(248, 250, 252, 0) 70%);
+}
+
+.dark .glow-mint-radial {
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.12) 0%, rgba(8, 18, 32, 0) 70%);
+}
+
+.light .glow-mint-radial {
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.12) 0%, rgba(248, 250, 252, 0) 70%);
+}
+
+/* Subtle glassmorphic and card borders */
+.dark .civic-card {
+  background: #0F1E33;
+  border: 1px solid rgba(30, 53, 91, 0.7);
+  transition: all 0.25s ease;
+}
+
+.light .civic-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+}
+
+.dark .civic-card:hover {
+  border-color: rgba(20, 184, 166, 0.4);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(13, 148, 136, 0.15);
+}
+
+.light .civic-card:hover {
+  border-color: rgba(13, 148, 136, 0.5);
+  box-shadow: 0 12px 25px -5px rgba(13, 148, 136, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+}
+
+/* Custom status pulse effect */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.15);
+  }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 2s infinite ease-in-out;
+}
