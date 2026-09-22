@@ -10,11 +10,13 @@ import {
   ShieldAlert,
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   UploadCloud,
   Sparkles,
   Navigation,
   Building2,
-  RefreshCw
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { ReportsService } from '../services/reportsService';
 
@@ -84,6 +86,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   onIssueCreated,
 }) => {
   const [step, setStep] = useState<'form' | 'success'>('form');
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<string>('Roads & Potholes');
   const [title, setTitle] = useState<string>('');
   const [location, setLocation] = useState<string>('FC Road (near Goodluck Cafe), Shivajinagar, Pune');
@@ -195,6 +198,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   const handleReset = () => {
     setStep('form');
+    setCurrentStep(1);
     setTitle('');
     setDescription('');
     setPhotoPreview(null);
@@ -209,7 +213,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
-        <div className="bg-slate-100 dark:bg-[#0F1E33] px-6 py-4 border-b border-slate-200 dark:border-[#1E355B] flex items-center justify-between">
+        <div className="bg-slate-100 dark:bg-[#0F1E33] px-6 py-4 border-b border-slate-200 dark:border-[#1E355B] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-deepTeal-50 dark:bg-deepTeal-950 border border-deepTeal-200 dark:border-deepTeal-600 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-deepTeal-600 dark:text-softMint-400 animate-pulse" />
@@ -234,243 +238,405 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          {step === 'form' ? (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              
-              {/* STEP 1: PHOTO UPLOAD & AI VISION ANALYSIS */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-teal-600 dark:text-emerald-400" />
-                    1. Upload Photo / AI Image Analysis
-                  </label>
-                  <span className="text-[11px] font-bold text-teal-600 dark:text-emerald-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> AI Auto-Fill Enabled
-                  </span>
+        {/* 3-Step Progress Indicator */}
+        {step === 'form' && (
+          <div className="bg-slate-50 dark:bg-[#081220] px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-[#1E355B] shrink-0">
+            <div className="flex items-center justify-between max-w-xl mx-auto">
+              {/* Step 1 Indicator */}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStep > 1
+                      ? 'bg-emerald-500 text-white'
+                      : currentStep === 1
+                      ? 'bg-teal-600 text-white ring-2 ring-teal-500/40 shadow-sm'
+                      : 'bg-slate-200 dark:bg-[#162846] text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {currentStep > 1 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '1'}
                 </div>
-
-                {/* Upload Zone / Preview */}
-                <div className="relative border-2 border-dashed rounded-2xl p-4 text-center border-teal-500/40 bg-teal-500/5 dark:bg-[#081220] hover:border-teal-500 transition-all">
-                  {isAnalyzingAI ? (
-                    <div className="py-8 flex flex-col items-center justify-center space-y-3">
-                      <RefreshCw className="w-8 h-8 text-teal-600 dark:text-emerald-400 animate-spin" />
-                      <p className="text-xs font-bold text-slate-900 dark:text-white">
-                        Analyzing photo with AI Vision...
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Detecting issue type, generating description & selecting department...
-                      </p>
-                    </div>
-                  ) : photoPreview ? (
-                    <div className="space-y-3">
-                      <div className="relative max-h-48 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 mx-auto max-w-sm">
-                        <img src={photoPreview} alt="Issue evidence" className="w-full h-44 object-cover" />
-                        <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-md text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-emerald-400" /> AI Scanned (98.4% Confidence)
-                        </div>
-                      </div>
-                      <div className="flex justify-center gap-2">
-                        <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-[#0F1E33] text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-300">
-                          Change Photo
-                          <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                        </label>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-4 space-y-3">
-                      <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-950 border border-teal-300 dark:border-teal-700 flex items-center justify-center mx-auto">
-                        <UploadCloud className="w-5 h-5 text-teal-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <label className="cursor-pointer px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-glow-teal inline-flex items-center gap-2">
-                          <Camera className="w-4 h-4" />
-                          <span>Upload Problem Photo</span>
-                          <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                        </label>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Or select a sample Pune issue photo below to simulate AI vision:
-                      </p>
-
-                      {/* Sample Preset Photos */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                        {SAMPLE_CIVIC_PHOTOS.map((p) => (
-                          <button
-                            type="button"
-                            key={p.id}
-                            onClick={() => triggerAIAnalysis(p)}
-                            className="p-2 rounded-xl bg-white dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] hover:border-teal-500 text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-left transition-all flex flex-col gap-1 hover:shadow-sm"
-                          >
-                            <span className="truncate font-bold">{p.name}</span>
-                            <span className="text-[9px] text-teal-600 dark:text-emerald-400">✨ Tap to Auto-Fill</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <span
+                  className={`text-xs font-semibold transition-colors ${
+                    currentStep === 1
+                      ? 'text-teal-700 dark:text-emerald-300 font-bold'
+                      : currentStep > 1
+                      ? 'text-slate-700 dark:text-slate-300'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  <span className="sm:hidden">Photo</span>
+                  <span className="hidden sm:inline">Upload Photo</span>
+                </span>
               </div>
 
-              {/* AI Auto-Fill Notification Badge */}
-              {aiAnalyzed && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-in fade-in">
-                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>AI auto-filled title, description, category & department!</span>
+              {/* Line between 1 & 2 */}
+              <div
+                className={`flex-1 mx-2 sm:mx-3 h-0.5 rounded transition-colors ${
+                  currentStep > 1 ? 'bg-emerald-500/60' : 'bg-slate-200 dark:bg-[#1E355B]'
+                }`}
+              />
+
+              {/* Step 2 Indicator */}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStep > 2
+                      ? 'bg-emerald-500 text-white'
+                      : currentStep === 2
+                      ? 'bg-teal-600 text-white ring-2 ring-teal-500/40 shadow-sm'
+                      : 'bg-slate-200 dark:bg-[#162846] text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {currentStep > 2 ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : '2'}
+                </div>
+                <span
+                  className={`text-xs font-semibold transition-colors ${
+                    currentStep === 2
+                      ? 'text-teal-700 dark:text-emerald-300 font-bold'
+                      : currentStep > 2
+                      ? 'text-slate-700 dark:text-slate-300'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  <span className="sm:hidden">Location</span>
+                  <span className="hidden sm:inline">Location & Category</span>
+                </span>
+              </div>
+
+              {/* Line between 2 & 3 */}
+              <div
+                className={`flex-1 mx-2 sm:mx-3 h-0.5 rounded transition-colors ${
+                  currentStep > 2 ? 'bg-emerald-500/60' : 'bg-slate-200 dark:bg-[#1E355B]'
+                }`}
+              />
+
+              {/* Step 3 Indicator */}
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStep === 3
+                      ? 'bg-teal-600 text-white ring-2 ring-teal-500/40 shadow-sm'
+                      : 'bg-slate-200 dark:bg-[#162846] text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  3
+                </div>
+                <span
+                  className={`text-xs font-semibold transition-colors ${
+                    currentStep === 3
+                      ? 'text-teal-700 dark:text-emerald-300 font-bold'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  <span className="sm:hidden">Details</span>
+                  <span className="hidden sm:inline">Details & Submit</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Content */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {step === 'form' ? (
+            <form onSubmit={handleSubmit} className="h-full flex flex-col justify-between space-y-6">
+              
+              {/* ━━━━━━━━━━━━━━━━━━━━ STEP 1: UPLOAD PHOTO ━━━━━━━━━━━━━━━━━━━━ */}
+              {currentStep === 1 && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5">
+                        <Camera className="w-4 h-4 text-teal-600 dark:text-emerald-400" />
+                        1. Upload Photo / AI Image Analysis
+                      </label>
+                      <span className="text-[11px] font-bold text-teal-600 dark:text-emerald-400 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> AI Auto-Fill Enabled
+                      </span>
+                    </div>
+
+                    {/* Upload Zone / Preview */}
+                    <div className="relative border-2 border-dashed rounded-2xl p-4 text-center border-teal-500/40 bg-teal-500/5 dark:bg-[#081220] hover:border-teal-500 transition-all">
+                      {isAnalyzingAI ? (
+                        <div className="py-8 flex flex-col items-center justify-center space-y-3">
+                          <RefreshCw className="w-8 h-8 text-teal-600 dark:text-emerald-400 animate-spin" />
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">
+                            Analyzing photo with AI Vision...
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Detecting issue type, generating description & selecting department...
+                          </p>
+                        </div>
+                      ) : photoPreview ? (
+                        <div className="space-y-3">
+                          <div className="relative max-h-48 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 mx-auto max-w-sm">
+                            <img src={photoPreview} alt="Issue evidence" className="w-full h-44 object-cover" />
+                            <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-md text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-emerald-400" /> AI Scanned (98.4% Confidence)
+                            </div>
+                          </div>
+                          <div className="flex justify-center gap-2">
+                            <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-[#0F1E33] text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-300">
+                              Change Photo
+                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-4 space-y-3">
+                          <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-950 border border-teal-300 dark:border-teal-700 flex items-center justify-center mx-auto">
+                            <UploadCloud className="w-5 h-5 text-teal-600 dark:text-emerald-400" />
+                          </div>
+                          <div>
+                            <label className="cursor-pointer px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-glow-teal inline-flex items-center gap-2">
+                              <Camera className="w-4 h-4" />
+                              <span>Upload Problem Photo</span>
+                              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                            </label>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Or select a sample Pune issue photo below to simulate AI vision:
+                          </p>
+
+                          {/* Sample Preset Photos */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                            {SAMPLE_CIVIC_PHOTOS.map((p) => (
+                              <button
+                                type="button"
+                                key={p.id}
+                                onClick={() => triggerAIAnalysis(p)}
+                                className="p-2 rounded-xl bg-white dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] hover:border-teal-500 text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-left transition-all flex flex-col gap-1 hover:shadow-sm"
+                              >
+                                <span className="truncate font-bold">{p.name}</span>
+                                <span className="text-[9px] text-teal-600 dark:text-emerald-400">✨ Tap to Auto-Fill</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-medium">You can edit below if needed</span>
+
+                  {/* AI Auto-Fill Notification Badge */}
+                  {aiAnalyzed && (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-in fade-in">
+                      <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>AI auto-filled title, description, category & department!</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-medium">You can edit below if needed</span>
+                    </div>
+                  )}
+
+                  {/* Step 1 Bottom Navigation */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-[#1E355B]">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-[#0F1E33] border border-slate-300 dark:border-[#1E355B] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#162846] text-xs sm:text-sm font-bold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center gap-2"
+                    >
+                      <span>Next</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* STEP 2: LOCATION PICKER (MANUAL OR CURRENT GPS) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-teal-600 dark:text-emerald-400" />
-                    2. Location (Manual / GPS Geotag)
-                  </label>
-                  <span className="text-[11px] text-teal-600 dark:text-emerald-400 font-mono font-medium">
-                    {gpsCoords}
-                  </span>
-                </div>
+              {/* ━━━━━━━━━━━━━━━━━━━━ STEP 2: LOCATION & CATEGORY ━━━━━━━━━━━━━━━━━━━━ */}
+              {currentStep === 2 && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  {/* Location Picker */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-teal-600 dark:text-emerald-400" />
+                        2. Location (Manual / GPS Geotag)
+                      </label>
+                      <span className="text-[11px] text-teal-600 dark:text-emerald-400 font-mono font-medium">
+                        {gpsCoords}
+                      </span>
+                    </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Enter street name, landmark, Ward number"
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleFetchLocation}
-                    disabled={isGettingLocation}
-                    className="px-3.5 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-700 text-teal-700 dark:text-emerald-300 hover:bg-teal-100 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
-                    title="Detect current GPS coordinates"
-                  >
-                    <Navigation className={`w-3.5 h-3.5 ${isGettingLocation ? 'animate-spin' : ''}`} />
-                    <span>{isGettingLocation ? 'Locating...' : 'Use Current Location'}</span>
-                  </button>
-                </div>
-              </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        required
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="Enter street name, landmark, Ward number"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleFetchLocation}
+                        disabled={isGettingLocation}
+                        className="px-3.5 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-700 text-teal-700 dark:text-emerald-300 hover:bg-teal-100 text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                        title="Detect current GPS coordinates"
+                      >
+                        <Navigation className={`w-3.5 h-3.5 ${isGettingLocation ? 'animate-spin' : ''}`} />
+                        <span>{isGettingLocation ? 'Locating...' : 'Use Current Location'}</span>
+                      </button>
+                    </div>
+                  </div>
 
-              {/* STEP 3: CATEGORY & MUNICIPAL DEPARTMENT ROUTING */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold">
-                    3. Category & Department Routing
-                  </label>
-                  <span className="text-[11px] font-semibold text-teal-600 dark:text-emerald-400 flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5" /> Routed to: <strong>{department}</strong>
-                  </span>
-                </div>
+                  {/* Category & Municipal Department Routing */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold">
+                        3. Category & Department Routing
+                      </label>
+                      <span className="text-[11px] font-semibold text-teal-600 dark:text-emerald-400 flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5" /> Routed to: <strong>{department}</strong>
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {categories.map((c) => (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {categories.map((c) => (
+                        <button
+                          type="button"
+                          key={c.name}
+                          onClick={() => {
+                            setCategory(c.name);
+                            if (c.name.includes('Roads')) setDepartment('Roads & Infrastructure');
+                            else if (c.name.includes('Light')) setDepartment('Electrical');
+                            else if (c.name.includes('Waste')) setDepartment('Sanitation');
+                            else if (c.name.includes('Water')) setDepartment('Water Department');
+                            else setDepartment('Public Works');
+                          }}
+                          className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all text-left border ${
+                            category === c.name
+                              ? 'bg-teal-600 text-white border-teal-500 shadow-sm font-bold'
+                              : 'bg-slate-50 dark:bg-[#0F1E33] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1E355B] hover:bg-slate-100 dark:hover:bg-[#162846]'
+                          }`}
+                        >
+                          {c.icon}
+                          <span className="truncate">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 2 Bottom Navigation */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-[#1E355B]">
                     <button
                       type="button"
-                      key={c.name}
-                      onClick={() => {
-                        setCategory(c.name);
-                        if (c.name.includes('Roads')) setDepartment('Roads & Infrastructure');
-                        else if (c.name.includes('Light')) setDepartment('Electrical');
-                        else if (c.name.includes('Waste')) setDepartment('Sanitation');
-                        else if (c.name.includes('Water')) setDepartment('Water Department');
-                        else setDepartment('Public Works');
-                      }}
-                      className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all text-left border ${
-                        category === c.name
-                          ? 'bg-teal-600 text-white border-teal-500 shadow-sm font-bold'
-                          : 'bg-slate-50 dark:bg-[#0F1E33] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1E355B] hover:bg-slate-100 dark:hover:bg-[#162846]'
-                      }`}
+                      onClick={() => setCurrentStep(1)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-[#0F1E33] border border-slate-300 dark:border-[#1E355B] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#162846] text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors"
                     >
-                      {c.icon}
-                      <span className="truncate">{c.name}</span>
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Back</span>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* STEP 4: TITLE & AI-GENERATED DESCRIPTION */}
-              <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                  4. Brief Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Issue title auto-filled by AI..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                  5. Problem Description (AI Generated)
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="AI generates full problem description upon uploading a photo..."
-                  className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              {/* Priority & Anonymous Toggles */}
-              <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#162846]">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Urgency:</span>
-                  {(['Medium', 'High', 'Critical'] as const).map((p) => (
                     <button
                       type="button"
-                      key={p}
-                      onClick={() => setPriority(p)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
-                        priority === p
-                          ? 'bg-teal-600 text-white shadow-sm'
-                          : 'bg-white dark:bg-[#0F1E33] text-slate-700 dark:text-slate-400 border border-slate-300 dark:border-[#1E355B]'
-                      }`}
+                      onClick={() => setCurrentStep(3)}
+                      className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center gap-2"
                     >
-                      {p}
+                      <span>Next</span>
+                      <ArrowRight className="w-4 h-4" />
                     </button>
-                  ))}
+                  </div>
                 </div>
+              )}
 
-                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isAnonymous}
-                    onChange={(e) => setIsAnonymous(e.target.checked)}
-                    className="rounded border-slate-400 text-teal-600 focus:ring-0"
-                  />
-                  <span>Report Anonymously</span>
-                </label>
-              </div>
+              {/* ━━━━━━━━━━━━━━━━━━━━ STEP 3: DETAILS & SUBMIT ━━━━━━━━━━━━━━━━━━━━ */}
+              {currentStep === 3 && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  {/* Title */}
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold mb-1.5">
+                      4. Brief Title
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Issue title auto-filled by AI..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <span>Transmitting to PMC Server...</span>
-                ) : (
-                  <>
-                    <UploadCloud className="w-5 h-5 text-slate-950" />
-                    <span>Submit Civic Report Now</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+                  {/* Problem Description */}
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-300 font-bold mb-1.5">
+                      5. Problem Description (AI Generated)
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="AI generates full problem description upon uploading a photo..."
+                      className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
+                  {/* Priority & Anonymous Toggles */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#162846]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Urgency:</span>
+                      {(['Medium', 'High', 'Critical'] as const).map((p) => (
+                        <button
+                          type="button"
+                          key={p}
+                          onClick={() => setPriority(p)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
+                            priority === p
+                              ? 'bg-teal-600 text-white shadow-sm'
+                              : 'bg-white dark:bg-[#0F1E33] text-slate-700 dark:text-slate-400 border border-slate-300 dark:border-[#1E355B]'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+
+                    <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isAnonymous}
+                        onChange={(e) => setIsAnonymous(e.target.checked)}
+                        className="rounded border-slate-400 text-teal-600 focus:ring-0"
+                      />
+                      <span>Report Anonymously</span>
+                    </label>
+                  </div>
+
+                  {/* Step 3 Bottom Navigation & Submit */}
+                  <div className="flex items-center gap-3 pt-4 border-t border-slate-200 dark:border-[#1E355B]">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="px-4 py-3 rounded-xl bg-slate-100 dark:bg-[#0F1E33] border border-slate-300 dark:border-[#1E355B] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#162846] text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Back</span>
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <span>Transmitting to PMC Server...</span>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-5 h-5 text-slate-950" />
+                          <span>Submit Civic Report Now</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </form>
           ) : (
             /* Success View */
