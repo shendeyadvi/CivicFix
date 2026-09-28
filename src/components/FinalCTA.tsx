@@ -47,7 +47,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onOpenReportModal, onOpenTra
                 className="w-full sm:w-auto group px-8 py-4 rounded-xl bg-deepTeal-600 hover:bg-deepTeal-500 text-white dark:text-slate-950 font-bold text-base shadow-lg shadow-teal-600/20 hover:shadow-xl hover:brightness-105 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-3 text-center"
               >
                 <ShieldAlert className="w-5 h-5" />
-                <span>Report an Issue</span>
+                <span>Start Now</span>
                 <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </button>
 

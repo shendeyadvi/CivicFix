@@ -79,9 +79,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center">
                 Civic<span className="text-deepTeal-600 dark:text-softMint-400">Fix</span>
-                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-deepTeal-50 dark:bg-deepTeal-950/80 border border-deepTeal-200 dark:border-deepTeal-700/50 text-deepTeal-700 dark:text-softMint-300">
-                  PUNE•PMC
-                </span>
               </span>
               <span className="text-[10px] text-slate-500 dark:text-slate-400 -mt-1 tracking-wider uppercase font-medium">
                 Public Infrastructure

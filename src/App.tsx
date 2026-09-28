@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
-import { StatsStrip } from './components/StatsStrip';
 import { HowItWorks } from './components/HowItWorks';
 import { Features } from './components/Features';
 import { IssueStatusPreview } from './components/IssueStatusPreview';
@@ -74,7 +73,6 @@ export const AppContent: React.FC = () => {
           onOpenReportModal={() => setLoginModalOpen(true)}
           onOpenTrackModal={() => setLoginModalOpen(true)}
         />
-        <StatsStrip />
         <HowItWorks
           onOpenReportModal={() => setLoginModalOpen(true)}
         />

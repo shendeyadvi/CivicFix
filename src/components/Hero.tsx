@@ -122,7 +122,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenReportModal, onOpenTrackModal 
                 onClick={onOpenReportModal}
                 className="group px-7 py-4 rounded-xl bg-gradient-to-r from-deepTeal-600 via-deepTeal-500 to-softMint-400 text-slate-950 font-bold text-base shadow-glow-teal hover:shadow-xl hover:brightness-110 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-3 text-center cursor-pointer"
               >
-                <span>Report an Issue</span>
+                <span>Start Now</span>
                 <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1.5" />
               </button>
 
