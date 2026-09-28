@@ -1,3 +1,5 @@
+import { ApiClient } from './apiClient';
+
 export interface CivicReportItem {
   id: string;
   trackingId: string;
@@ -18,187 +20,80 @@ export interface CivicReportItem {
   lng: number;
   upvotes: number;
   image?: string;
+  timeline?: {
+    step: string;
+    date: string;
+    completed: boolean;
+    current?: boolean;
+    note?: string;
+  }[];
 }
 
 const STORAGE_KEY = 'civicfix_reports_data';
 
-export const INITIAL_SEED_REPORTS: CivicReportItem[] = [
-  {
-    id: 'rep-101',
-    trackingId: 'CF-2026-10482',
-    title: 'Large Pothole on Main Road',
-    category: 'Roads & Potholes',
-    location: 'MG Road, Camp Area, Pune',
-    ward: 'Ward 14 - Camp Zone',
-    priority: 'High',
-    department: 'Roads & Infrastructure',
-    assignedTo: 'Eng. Rajesh Deshmukh',
-    status: 'Pending Verification',
-    date: '18 Sep 2026',
-    reportedAgo: '4 hours ago',
-    citizenName: 'Aarav Deshmukh',
-    citizenPhone: '+91 98765 43210',
-    description: 'Deep pothole causing traffic slowdown near MG Road signal. Water accumulation inside.',
-    lat: 18.5204,
-    lng: 73.8567,
-    upvotes: 3,
-  },
-  {
-    id: 'rep-102',
-    trackingId: 'CF-2026-10476',
-    title: 'Broken Streetlight Poles',
-    category: 'Street Lighting',
-    location: 'Koregaon Park Lane 7, Pune',
-    ward: 'Ward 08 - Koregaon Park',
-    priority: 'Medium',
-    department: 'Electrical',
-    assignedTo: 'Electrical Team B',
-    status: 'Pending Verification',
-    date: '18 Sep 2026',
-    reportedAgo: '6 hours ago',
-    citizenName: 'Priya Nair',
-    citizenPhone: '+91 98123 45678',
-    description: 'Multiple streetlights unlit along Lane 7, creating safety concerns at night.',
-    lat: 18.5362,
-    lng: 73.8940,
-    upvotes: 2,
-  },
-  {
-    id: 'rep-103',
-    trackingId: 'CF-2026-10465',
-    title: 'Garbage Overflow near Market',
-    category: 'Sanitation & Waste',
-    location: 'Mandai Market, Shukrawar Peth, Pune',
-    ward: 'Ward 11 - Peth Zone',
-    priority: 'High',
-    department: 'Sanitation',
-    assignedTo: 'Sanitation Inspector Kulkarni',
-    status: 'Pending Verification',
-    date: '17 Sep 2026',
-    reportedAgo: '1 day ago',
-    citizenName: 'Sunil Joshi',
-    citizenPhone: '+91 97654 32109',
-    description: 'Overloaded community trash container spilling onto pedestrian walkway.',
-    lat: 18.5126,
-    lng: 73.8553,
-    upvotes: 4,
-  },
-  {
-    id: 'rep-104',
-    trackingId: 'CF-2026-10451',
-    title: 'Major Water Pipeline Leakage',
-    category: 'Water & Drainage',
-    location: 'DP Road, Aundh, Pune',
-    ward: 'Ward 03 - Aundh Zone',
-    priority: 'Critical',
-    department: 'Water Department',
-    assignedTo: 'Rapid Water Response Unit',
-    status: 'Pending Verification',
-    date: '16 Sep 2026',
-    reportedAgo: '2 days ago',
-    citizenName: 'Vikram Mehta',
-    citizenPhone: '+91 99887 76655',
-    description: 'High-pressure water main leaking continuously onto main DP Road road surface.',
-    lat: 18.5580,
-    lng: 73.8077,
-    upvotes: 5,
-  },
-  {
-    id: 'rep-105',
-    trackingId: 'CF-2026-10440',
-    title: 'Clogged Stormwater Drain',
-    category: 'Water & Drainage',
-    location: 'FC Road, Shivajinagar, Pune',
-    ward: 'Ward 12 - Shivajinagar',
-    priority: 'High',
-    department: 'Public Works',
-    assignedTo: 'Drainage Crew Alpha',
-    status: 'Pending Verification',
-    date: '19 Sep 2026',
-    reportedAgo: '2 hours ago',
-    citizenName: 'Neha Shinde',
-    citizenPhone: '+91 96543 21098',
-    description: 'Drain inlet blocked with dry leaves and silt, causing puddle overflow.',
-    lat: 18.5284,
-    lng: 73.8415,
-    upvotes: 1,
-  },
-  {
-    id: 'rep-106',
-    trackingId: 'CF-2026-10432',
-    title: 'Hazardous Overhead Cable',
-    category: 'Public Safety',
-    location: 'Viman Nagar Main Road, Pune',
-    ward: 'Ward 06 - Viman Nagar',
-    priority: 'Critical',
-    department: 'Electrical',
-    assignedTo: 'Emergency Power Wing',
-    status: 'New',
-    date: '20 Sep 2026',
-    reportedAgo: '45 mins ago',
-    citizenName: 'Anil Agarwal',
-    citizenPhone: '+91 95432 10987',
-    description: 'Dangling electrical/telecom wire hanging low near bus stop.',
-    lat: 18.5679,
-    lng: 73.9143,
-    upvotes: 2,
-  },
-  {
-    id: 'rep-107',
-    trackingId: 'CF-2026-10425',
-    title: 'Public Park Light Malfunction',
-    category: 'Street Lighting',
-    location: 'Chhatrapati Sambhaji Garden, JM Road, Pune',
-    ward: 'Ward 12 - Shivajinagar',
-    priority: 'Low',
-    department: 'Electrical',
-    assignedTo: 'Garden Maintenance Dept',
-    status: 'Pending Verification',
-    date: '19 Sep 2026',
-    reportedAgo: '1 day ago',
-    citizenName: 'Smita Kulkarni',
-    citizenPhone: '+91 94321 09876',
-    description: 'Solar park lights dimming out prematurely at 8 PM.',
-    lat: 18.5215,
-    lng: 73.8478,
-    upvotes: 3,
-  }
-];
+// In-memory cache for ultra-responsive UI renders
+let memoryCache: CivicReportItem[] = [];
+let isInitialized = false;
 
 export class ReportsService {
+  // Synchronous getter from cache / storage (safe for immediate component render)
   public static getReports(): CivicReportItem[] {
+    if (memoryCache.length > 0) {
+      return memoryCache;
+    }
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
-        const parsed: CivicReportItem[] = JSON.parse(data);
-        // Sanitize any legacy seed items with 'In Progress' to 'Pending Verification'
-        const sanitized = parsed.map((item) =>
-          item.status === 'In Progress' ? { ...item, status: 'Pending Verification' as const } : item
-        );
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-        return sanitized;
+        memoryCache = JSON.parse(data);
+        return memoryCache;
       }
     } catch {
-      // Fallback if localStorage fails
+      // ignore
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SEED_REPORTS));
-    return INITIAL_SEED_REPORTS;
+    return [];
   }
 
-  private static notifyChange() {
+  private static notifyChange(reports: CivicReportItem[]) {
+    memoryCache = reports;
     try {
-      window.dispatchEvent(new CustomEvent('civicfix_reports_updated'));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+      window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: reports }));
     } catch {
-      // Ignore in non-browser environment
+      // ignore
     }
   }
 
-  public static addReport(report: Partial<CivicReportItem>): CivicReportItem {
+  // Fetch all reports from the real backend API
+  public static async fetchReports(): Promise<CivicReportItem[]> {
+    try {
+      const reports = await ApiClient.get<CivicReportItem[]>('/api/reports');
+      if (Array.isArray(reports)) {
+        this.notifyChange(reports);
+        return reports;
+      }
+    } catch (err) {
+      console.warn('Backend /api/reports unavailable, using local cache:', err);
+    }
+    return this.getReports();
+  }
+
+  // Submit a new civic report to the backend database
+  public static async addReport(report: Partial<CivicReportItem>): Promise<CivicReportItem> {
+    try {
+      const response = await ApiClient.post<{ message: string; report: CivicReportItem }>('/api/reports', report);
+      if (response && response.report) {
+        await this.fetchReports(); // Refresh global list
+        return response.report;
+      }
+    } catch (err) {
+      console.warn('Backend report submission failed, saving locally:', err);
+    }
+
+    // Fallback local creation if backend temporarily offline
     const reports = this.getReports();
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const trackingId = `CF-2026-${randomNum}`;
-    
-    // Map category to department
+
     let department: CivicReportItem['department'] = 'Roads & Infrastructure';
     const cat = report.category || 'Roads & Potholes';
     if (cat.includes('Light')) department = 'Electrical';
@@ -212,7 +107,7 @@ export class ReportsService {
       title: report.title || 'Civic Complaint',
       category: cat,
       location: report.location || 'FC Road, Shivajinagar, Pune',
-      ward: 'Ward 12 - Shivajinagar',
+      ward: report.ward || 'Ward 12 - Shivajinagar',
       priority: report.priority || 'Medium',
       department,
       assignedTo: 'PMC Nodal Officer',
@@ -220,47 +115,160 @@ export class ReportsService {
       date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       reportedAgo: 'Just now',
       citizenName: report.citizenName || 'Aarav Deshmukh',
-      citizenPhone: '+91 98765 43210',
-      description: report.description || 'Citizen reported issue via CivicFix AI app.',
-      lat: 18.5204 + (Math.random() * 0.04 - 0.02),
-      lng: 73.8567 + (Math.random() * 0.04 - 0.02),
+      citizenPhone: report.citizenPhone || '+91 98765 43210',
+      description: report.description || 'Citizen reported issue via CivicFix app.',
+      lat: report.lat || 18.5204 + (Math.random() * 0.04 - 0.02),
+      lng: report.lng || 73.8567 + (Math.random() * 0.04 - 0.02),
       upvotes: 1,
       image: report.image,
+      timeline: [
+        { step: 'Report Submitted', date: 'Today', completed: true },
+        { step: 'AI Issue Verification', date: 'Pending', completed: false, current: true },
+        { step: 'Team Assignment', date: 'Pending', completed: false },
+        { step: 'Issue Resolved', date: 'Pending', completed: false },
+      ],
     };
 
     const updated = [newReport, ...reports];
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      // Handle storage exception
-    }
-    this.notifyChange();
+    this.notifyChange(updated);
     return newReport;
   }
 
-  public static deleteReport(idOrTrackingId: string): boolean {
-    const reports = this.getReports();
-    const updated = reports.filter((r) => r.id !== idOrTrackingId && r.trackingId !== idOrTrackingId);
+  // Track report by ticket tracking ID from backend database
+  public static async trackReport(trackingId: string): Promise<CivicReportItem | null> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      this.notifyChange();
-      return true;
+      const data = await ApiClient.get<CivicReportItem>(`/api/reports/track/${encodeURIComponent(trackingId)}`);
+      return data;
     } catch {
-      return false;
+      // Fallback search in local cache
+      const reports = this.getReports();
+      const q = trackingId.toUpperCase().trim();
+      return reports.find((r) => r.trackingId.toUpperCase() === q || r.id === trackingId) || null;
     }
   }
 
-  public static updateStatus(trackingId: string, newStatus: CivicReportItem['status']): boolean {
-    const reports = this.getReports();
-    const updated = reports.map((r) =>
-      r.trackingId === trackingId || r.id === trackingId ? { ...r, status: newStatus } : r
-    );
+  // Delete report
+  public static async deleteReport(idOrTrackingId: string): Promise<boolean> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      this.notifyChange();
+      await ApiClient.delete(`/api/reports/${encodeURIComponent(idOrTrackingId)}`);
+      await this.fetchReports();
       return true;
     } catch {
-      return false;
+      const reports = this.getReports();
+      const updated = reports.filter((r) => r.id !== idOrTrackingId && r.trackingId !== idOrTrackingId);
+      this.notifyChange(updated);
+      return true;
     }
   }
+
+  // Update report status (Official action)
+  public static async updateStatus(trackingId: string, newStatus: CivicReportItem['status']): Promise<boolean> {
+    try {
+      await ApiClient.patch(`/api/reports/${encodeURIComponent(trackingId)}/status`, { status: newStatus });
+      await this.fetchReports();
+      return true;
+    } catch {
+      const reports = this.getReports();
+      const updated = reports.map((r) =>
+        r.trackingId === trackingId || r.id === trackingId ? { ...r, status: newStatus } : r
+      );
+      this.notifyChange(updated);
+      return true;
+    }
+  }
+
+  // Reassign department
+  public static async assignDepartment(trackingId: string, department: string): Promise<boolean> {
+    try {
+      await ApiClient.patch(`/api/reports/${encodeURIComponent(trackingId)}/department`, { department });
+      await this.fetchReports();
+      return true;
+    } catch {
+      const reports = this.getReports();
+      const updated = reports.map((r) =>
+        r.trackingId === trackingId || r.id === trackingId ? { ...r, department: department as any, status: 'Assigned' as const } : r
+      );
+      this.notifyChange(updated);
+      return true;
+    }
+  }
+
+  // Upvote report
+  public static async upvoteReport(id: string): Promise<{ upvoted: boolean; upvotes: number }> {
+    try {
+      return await ApiClient.post<{ upvoted: boolean; upvotes: number }>(`/api/reports/${encodeURIComponent(id)}/upvote`);
+    } catch {
+      const reports = this.getReports();
+      let upvotes = 1;
+      const updated = reports.map((r) => {
+        if (r.id === id || r.trackingId === id) {
+          upvotes = r.upvotes + 1;
+          return { ...r, upvotes };
+        }
+        return r;
+      });
+      this.notifyChange(updated);
+      return { upvoted: true, upvotes };
+    }
+  }
+
+  // Check duplicate report in proximity
+  public static async checkDuplicate(category: string, lat: number, lng: number, title?: string) {
+    try {
+      return await ApiClient.post<{
+        isDuplicate: boolean;
+        confidence: number;
+        duplicateCount: number;
+        existingReport?: {
+          id: string;
+          trackingId: string;
+          title: string;
+          category: string;
+          location: string;
+          status: string;
+          distanceMeters: number;
+        };
+      }>('/api/reports/check-duplicate', { category, lat, lng, title });
+    } catch {
+      return { isDuplicate: false, confidence: 0, duplicateCount: 0 };
+    }
+  }
+
+  // AI Multimodal Vision Analysis
+  public static async analyzeImage(imagePayload: { file?: File; base64?: string; hint?: string }) {
+    try {
+      if (imagePayload.file) {
+        const formData = new FormData();
+        formData.append('image', imagePayload.file);
+        if (imagePayload.hint) formData.append('hint', imagePayload.hint);
+        const response = await ApiClient.post<{ success: boolean; data: any }>('/api/ai/analyze-image', formData);
+        return response.data;
+      } else if (imagePayload.base64) {
+        const response = await ApiClient.post<{ success: boolean; data: any }>('/api/ai/analyze-image', {
+          base64: imagePayload.base64,
+          hint: imagePayload.hint,
+        });
+        return response.data;
+      }
+    } catch (err) {
+      console.warn('Backend AI analysis unavailable, using fallback diagnostic:', err);
+    }
+    return null;
+  }
+}
+
+// Auto-initialize data and background multi-device synchronization
+if (typeof window !== 'undefined' && !isInitialized) {
+  isInitialized = true;
+  ReportsService.fetchReports();
+
+  // Poll backend every 4 seconds to sync multi-user updates automatically across devices
+  setInterval(() => {
+    ReportsService.fetchReports();
+  }, 4000);
+
+  // Sync on window focus
+  window.addEventListener('focus', () => {
+    ReportsService.fetchReports();
+  });
 }

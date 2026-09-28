@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String    @default("citizen") // "citizen" | "official"
+  ward         String?
+  department   String?
+  employeeId   String?
+  isDemo       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  reports      Report[]
+  upvotes      Upvote[]
+}
+
+model Report {
+  id           String          @id @default(uuid())
+  trackingId   String          @unique
+  title        String
+  category     String
+  location     String
+  ward         String
+  priority     String          @default("Medium") // "Low" | "Medium" | "High" | "Critical"
+  department   String          @default("Roads & Infrastructure")
+  assignedTo   String          @default("PMC Nodal Officer")
+  status       String          @default("New") // "New" | "Pending Verification" | "Verified" | "Assigned" | "In Progress" | "Resolved" | "Closed" | "Rejected" | "Overdue"
+  date         String
+  reportedAgo  String          @default("Just now")
+  citizenName  String
+  citizenPhone String
+  description  String
+  lat          Float
+  lng          Float
+  upvotesCount Int             @default(0)
+  imageUrl     String?
+  userId       String?
+  user         User?           @relation(fields: [userId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  timeline     TimelineEvent[]
+  upvotes      Upvote[]
+}
+
+model TimelineEvent {
+  id        String   @id @default(uuid())
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  step      String
+  date      String
+  completed Boolean  @default(false)
+  current   Boolean  @default(false)
+  note      String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Upvote {
+  id        String   @id @default(uuid())
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@unique([reportId, userId])
+}

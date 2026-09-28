@@ -20,19 +20,9 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
     if (isOpen && initialTrackingId && autoSearchDone.current !== initialTrackingId) {
       autoSearchDone.current = initialTrackingId;
       setSearchId(initialTrackingId);
-      // Trigger search programmatically
-      const query = initialTrackingId.trim().toUpperCase();
-      const found = HERO_MAP_ISSUES.find(
-        (i) => i.trackingId.toUpperCase() === query || i.id.toLowerCase() === query.toLowerCase()
-      );
-      if (found) {
-        setMatchedIssue(found);
-        setReportImage(null);
-      } else {
-        const userReports = ReportsService.getReports();
-        const userReport = userReports.find(
-          (r) => r.trackingId.toUpperCase() === query || r.id.toLowerCase() === query.toLowerCase()
-        );
+      
+      const doSearch = async () => {
+        const userReport = await ReportsService.trackReport(initialTrackingId);
         if (userReport) {
           setMatchedIssue({
             id: userReport.id,
@@ -51,7 +41,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
             estimatedFixTime: '48 Hours',
             description: userReport.description,
             upvotes: userReport.upvotes,
-            timeline: [
+            timeline: userReport.timeline && userReport.timeline.length > 0 ? userReport.timeline : [
               { step: 'Report Submitted', date: userReport.date, completed: true },
               { step: 'Issue Verification', date: 'Pending', completed: false },
               { step: 'Team Assignment', date: 'Pending', completed: false },
@@ -60,7 +50,9 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
           });
           setReportImage(userReport.image || null);
         }
-      }
+      };
+
+      doSearch();
     }
     if (!isOpen) {
       autoSearchDone.current = undefined;
@@ -69,50 +61,45 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
 
   if (!isOpen) return null;
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchId.trim().toUpperCase();
-    const found = HERO_MAP_ISSUES.find(
-      (i) => i.trackingId.toUpperCase() === query || i.id.toLowerCase() === query.toLowerCase()
-    );
-    if (found) {
-      setMatchedIssue(found);
-      setReportImage(null);
+    const userReport = await ReportsService.trackReport(query);
+
+    if (userReport) {
+      setMatchedIssue({
+        id: userReport.id,
+        trackingId: userReport.trackingId,
+        title: userReport.title,
+        category: userReport.category as CivicIssue['category'],
+        location: userReport.location,
+        mapQuery: '',
+        coordinates: { x: 50, y: 50 },
+        reportedDate: userReport.date,
+        status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
+        statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
+        priority: userReport.priority,
+        department: userReport.department,
+        assignedOfficer: userReport.assignedTo,
+        estimatedFixTime: '48 Hours',
+        description: userReport.description,
+        upvotes: userReport.upvotes,
+        timeline: userReport.timeline && userReport.timeline.length > 0 ? userReport.timeline : [
+          { step: 'Report Submitted', date: userReport.date, completed: true },
+          { step: 'Issue Verification', date: 'Pending', completed: false },
+          { step: 'Team Assignment', date: 'Pending', completed: false },
+          { step: 'Issue Resolved', date: 'Pending', completed: false },
+        ],
+      });
+      setReportImage(userReport.image || null);
     } else {
-      // Search user-submitted reports from ReportsService
-      const userReports = ReportsService.getReports();
-      const userReport = userReports.find(
-        (r) => r.trackingId.toUpperCase() === query || r.id.toLowerCase() === query.toLowerCase()
+      const found = HERO_MAP_ISSUES.find(
+        (i) => i.trackingId.toUpperCase() === query || i.id.toLowerCase() === query.toLowerCase()
       );
-      if (userReport) {
-        // Convert CivicReportItem to CivicIssue shape for display
-        setMatchedIssue({
-          id: userReport.id,
-          trackingId: userReport.trackingId,
-          title: userReport.title,
-          category: userReport.category as CivicIssue['category'],
-          location: userReport.location,
-          mapQuery: '',
-          coordinates: { x: 50, y: 50 },
-          reportedDate: userReport.date,
-          status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
-          statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
-          priority: userReport.priority,
-          department: userReport.department,
-          assignedOfficer: userReport.assignedTo,
-          estimatedFixTime: '48 Hours',
-          description: userReport.description,
-          upvotes: userReport.upvotes,
-          timeline: [
-            { step: 'Report Submitted', date: userReport.date, completed: true },
-            { step: 'Issue Verification', date: 'Pending', completed: false },
-            { step: 'Team Assignment', date: 'Pending', completed: false },
-            { step: 'Issue Resolved', date: 'Pending', completed: false },
-          ],
-        });
-        setReportImage(userReport.image || null);
+      if (found) {
+        setMatchedIssue(found);
+        setReportImage(null);
       } else {
-        // Default to first with updated ID if not found
         setMatchedIssue({
           ...HERO_MAP_ISSUES[0],
           trackingId: query.startsWith('CF-') ? query : `CF-${query}`,

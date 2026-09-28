@@ -113,29 +113,49 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   ];
 
   // AI Auto-Analyze Photo Function
-  const triggerAIAnalysis = (samplePhoto?: SamplePhoto, fileUrl?: string) => {
+  const triggerAIAnalysis = async (samplePhoto?: SamplePhoto, fileUrl?: string, fileObj?: File) => {
     setIsAnalyzingAI(true);
     setAiAnalyzed(false);
 
-    setTimeout(() => {
-      if (samplePhoto) {
-        setPhotoPreview(samplePhoto.imagePreview);
-        setTitle(samplePhoto.title);
-        setDescription(samplePhoto.description);
-        setCategory(samplePhoto.category);
-        setDepartment(samplePhoto.department);
-        setPriority(samplePhoto.priority);
-      } else {
-        setPhotoPreview(fileUrl || 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=500&auto=format&fit=crop&q=60');
-        setTitle('Detected Civic Infrastructure Damage');
-        setDescription('AI Vision Analysis: Detected severe asphalt degradation and hazardous surface pothole requiring municipal road maintenance repair.');
-        setCategory('Roads & Potholes');
-        setDepartment('Roads & Infrastructure');
-        setPriority('High');
-      }
+    if (samplePhoto) {
+      setPhotoPreview(samplePhoto.imagePreview);
+      setTitle(samplePhoto.title);
+      setDescription(samplePhoto.description);
+      setCategory(samplePhoto.category);
+      setDepartment(samplePhoto.department);
+      setPriority(samplePhoto.priority);
       setIsAnalyzingAI(false);
       setAiAnalyzed(true);
-    }, 900);
+      return;
+    }
+
+    if (fileUrl) {
+      setPhotoPreview(fileUrl);
+    }
+
+    try {
+      const aiResult = await ReportsService.analyzeImage({
+        file: fileObj,
+        base64: fileUrl,
+        hint: category,
+      });
+
+      if (aiResult) {
+        setTitle(aiResult.title || 'Detected Civic Infrastructure Damage');
+        setDescription(aiResult.description || 'AI analyzed image and detected civic maintenance requirement.');
+        setCategory(aiResult.category || 'Roads & Potholes');
+        setDepartment(aiResult.department || 'Roads & Infrastructure');
+        setPriority(aiResult.priority || 'High');
+      } else {
+        setTitle('Detected Civic Infrastructure Damage');
+        setDescription('AI Vision Analysis: Detected infrastructure degradation requiring municipal repair dispatch.');
+      }
+    } catch (err) {
+      console.warn('AI analysis error:', err);
+    } finally {
+      setIsAnalyzingAI(false);
+      setAiAnalyzed(true);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +163,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        triggerAIAnalysis(undefined, reader.result as string);
+        triggerAIAnalysis(undefined, reader.result as string, file);
       };
       reader.readAsDataURL(file);
     }
@@ -194,12 +214,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const created = ReportsService.addReport({
+    try {
+      const created = await ReportsService.addReport({
         title: title || 'Civic Complaint',
         category,
         location,
@@ -213,7 +233,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       if (onIssueCreated) {
         onIssueCreated(created.trackingId);
       }
-    }, 800);
+    } catch (err) {
+      console.error('Submit error:', err);
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {

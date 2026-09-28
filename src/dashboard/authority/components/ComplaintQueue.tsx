@@ -50,31 +50,22 @@ export const ComplaintQueue: React.FC<ComplaintQueueProps> = ({
     return true;
   });
 
-  const handleUpdateStatus = (newStatus: CivicReportItem['status']) => {
+  const handleUpdateStatus = async (newStatus: CivicReportItem['status']) => {
     if (!selectedComplaint) return;
-    ReportsService.updateStatus(selectedComplaint.id, newStatus);
+    await ReportsService.updateStatus(selectedComplaint.id, newStatus);
     setSelectedComplaint((prev) => (prev ? { ...prev, status: newStatus } : null));
   };
 
-  const handleAssignDepartment = (dept: CivicReportItem['department']) => {
+  const handleAssignDepartment = async (dept: CivicReportItem['department']) => {
     if (!selectedComplaint) return;
-    const reports = ReportsService.getReports();
-    const updated = reports.map((r) =>
-      r.id === selectedComplaint.id ? { ...r, department: dept, status: 'Assigned' as const } : r
-    );
-    try {
-      localStorage.setItem('civicfix_reports_data', JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('civicfix_reports_updated'));
-    } catch {
-      // ignore
-    }
+    await ReportsService.assignDepartment(selectedComplaint.id, dept);
     setSelectedComplaint((prev) => (prev ? { ...prev, department: dept, status: 'Assigned' } : null));
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string, title: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
     e.stopPropagation();
     if (window.confirm(`Delete complaint "${title}" permanently?`)) {
-      ReportsService.deleteReport(id);
+      await ReportsService.deleteReport(id);
       if (selectedComplaint && selectedComplaint.id === id) {
         setSelectedComplaint(null);
       }

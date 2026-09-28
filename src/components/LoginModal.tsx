@@ -60,7 +60,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     setSuccessMsg('');
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErrors();
 
@@ -75,31 +75,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
     setIsLoading(true);
 
-    const existing = AuthService.getCurrentUser();
-    let name = '';
-    if (existing && (existing.email.toLowerCase() === signInIdentifier.trim().toLowerCase() || existing.name)) {
-      name = existing.name;
-    } else {
-      if (signInIdentifier.includes('@')) {
-        const raw = signInIdentifier.split('@')[0];
-        name = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/[^a-zA-Z]/g, ' ');
-      } else {
-        name = role === 'citizen' ? 'Citizen Resident' : 'Municipal Officer';
-      }
-    }
-
-    const userProfile: UserProfile = {
-      name: name,
-      email: signInIdentifier.trim(),
-      ward: role === 'citizen' ? (existing?.ward || 'Ward 12 - Shivajinagar / FC Road, Pune') : undefined,
-      department: role === 'official' ? (existing?.department || 'Road Works & Infrastructure') : undefined,
-      employeeId: role === 'official' ? (existing?.employeeId || 'PMC-OFF-8842') : undefined,
-      role: role,
-      isDemo: false,
-    };
-    AuthService.setCurrentUser(userProfile);
-
-    setTimeout(() => {
+    try {
+      const userProfile = await AuthService.login(signInIdentifier.trim(), signInPassword, role);
       setIsLoading(false);
       setSuccessMsg(`Welcome back, ${userProfile.name}!`);
       setTimeout(() => {
@@ -107,11 +84,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         if (onLoginSuccess) {
           onLoginSuccess(role, userProfile);
         }
-      }, 700);
-    }, 600);
+      }, 500);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Failed to sign in. Please verify your credentials.');
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     resetErrors();
 
@@ -138,19 +118,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
     setIsLoading(true);
 
-    const userProfile: UserProfile = {
-      name: fullName.trim(),
-      email: signUpEmail.trim(),
-      phone: signUpPhone.trim() || undefined,
-      ward: role === 'citizen' ? selectedWard : undefined,
-      department: role === 'official' ? selectedDept : undefined,
-      employeeId: role === 'official' ? (employeeId.trim() || 'PMC-OFF-' + Math.floor(1000 + Math.random() * 9000)) : undefined,
-      role: role,
-      isDemo: false,
-    };
-    AuthService.setCurrentUser(userProfile);
+    try {
+      const userProfile = await AuthService.register({
+        name: fullName.trim(),
+        email: signUpEmail.trim(),
+        password: signUpPassword,
+        phone: signUpPhone.trim() || undefined,
+        ward: role === 'citizen' ? selectedWard : undefined,
+        department: role === 'official' ? selectedDept : undefined,
+        employeeId: role === 'official' ? (employeeId.trim() || 'PMC-OFF-' + Math.floor(1000 + Math.random() * 9000)) : undefined,
+        role,
+      });
 
-    setTimeout(() => {
       setIsLoading(false);
       setSuccessMsg(`Account created! Welcome to CivicFix, ${fullName.trim()}.`);
       setTimeout(() => {
@@ -158,34 +137,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         if (onLoginSuccess) {
           onLoginSuccess(role, userProfile);
         }
-      }, 800);
-    }, 700);
+      }, 500);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Failed to create account.');
+    }
   };
 
-  const handleDemoLogin = (demoRole: 'citizen' | 'official') => {
+  const handleDemoLogin = async (demoRole: 'citizen' | 'official') => {
     setRole(demoRole);
     resetErrors();
     setIsLoading(true);
 
-    const demoProfile: UserProfile = demoRole === 'citizen' ? {
-      name: 'Aarav Deshmukh (Demo Citizen)',
-      email: 'aarav.demo@civicfix.in',
-      phone: '+91 98765 43210',
-      ward: 'Ward 12 - Shivajinagar / FC Road, Pune',
-      role: 'citizen',
-      isDemo: true,
-    } : {
-      name: 'Officer Kulkarni (Demo Officer)',
-      email: 'officer.kulkarni@pmc.punecorp.in',
-      ward: 'Pune Municipal Corp (PMC) — Central Zone',
-      department: 'PMC Road Works & Infrastructure',
-      employeeId: 'PMC-OFF-8842',
-      role: 'official',
-      isDemo: true,
-    };
-    AuthService.setCurrentUser(demoProfile);
-
-    setTimeout(() => {
+    try {
+      const demoProfile = await AuthService.demoLogin(demoRole);
       setIsLoading(false);
       setSuccessMsg(`Logged in with ${demoRole === 'citizen' ? 'Citizen' : 'Municipal Officer'} Demo credentials.`);
       setTimeout(() => {
@@ -194,7 +159,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           onLoginSuccess(demoRole, demoProfile);
         }
       }, 400);
-    }, 400);
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMsg('Failed to login with demo credentials.');
+    }
   };
 
   return (
