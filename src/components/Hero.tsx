@@ -75,12 +75,12 @@ export const Hero: React.FC<HeroProps> = ({ onOpenReportModal, onOpenTrackModal 
   return (
     <section
       id="home"
-      className="relative pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden civic-grid bg-slate-50 dark:bg-[#081220] transition-colors duration-300"
+      className="relative pt-28 pb-8 lg:pt-36 lg:pb-12 overflow-hidden civic-grid bg-slate-50 dark:bg-[#081220] transition-colors duration-300"
     >
       {/* Ambient background glows */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] glow-teal-radial pointer-events-none rounded-full" />
       <div className="absolute top-1/3 right-10 w-[450px] h-[450px] glow-mint-radial pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-50 dark:from-[#081220] to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-50 dark:from-[#081220] to-transparent pointer-events-none" />
 
       <div className="w-full px-4 sm:px-6 lg:px-12 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">

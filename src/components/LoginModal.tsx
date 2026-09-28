@@ -1,212 +1,706 @@
 import React, { useState } from 'react';
-import { X, User, Building, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import {
+  X,
+  User,
+  Building2,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Mail,
+  Lock,
+  Phone,
+  Eye,
+  EyeOff,
+  UserPlus,
+  LogIn,
+  MapPin,
+  Briefcase,
+  AlertCircle
+} from 'lucide-react';
+
+import { AuthService, type UserProfile } from '../services/authService';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess?: (role: 'citizen' | 'official') => void;
+  onLoginSuccess?: (role: 'citizen' | 'official', user?: UserProfile) => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [role, setRole] = useState<'citizen' | 'official'>('citizen');
-  const [identifier, setIdentifier] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [loggedIn, setLoggedIn] = useState(false);
+  
+  // Sign In state
+  const [signInIdentifier, setSignInIdentifier] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Sign Up state
+  const [fullName, setFullName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [selectedWard, setSelectedWard] = useState('Ward 12 - Shivajinagar');
+  const [selectedDept, setSelectedDept] = useState('Road Works & Infrastructure');
+  const [employeeId, setEmployeeId] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+
+  // State flags
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSendOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpSent(true);
+  const resetErrors = () => {
+    setErrorMsg('');
+    setSuccessMsg('');
   };
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoggedIn(true);
-    onClose();
-    if (onLoginSuccess) {
-      onLoginSuccess(role);
+    resetErrors();
+
+    if (!signInIdentifier.trim()) {
+      setErrorMsg('Please enter your email, phone number, or officer ID.');
+      return;
     }
+    if (!signInPassword) {
+      setErrorMsg('Please enter your password.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const existing = AuthService.getCurrentUser();
+    let name = '';
+    if (existing && (existing.email.toLowerCase() === signInIdentifier.trim().toLowerCase() || existing.name)) {
+      name = existing.name;
+    } else {
+      if (signInIdentifier.includes('@')) {
+        const raw = signInIdentifier.split('@')[0];
+        name = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/[^a-zA-Z]/g, ' ');
+      } else {
+        name = role === 'citizen' ? 'Citizen Resident' : 'Municipal Officer';
+      }
+    }
+
+    const userProfile: UserProfile = {
+      name: name,
+      email: signInIdentifier.trim(),
+      ward: role === 'citizen' ? (existing?.ward || 'Ward 12 - Shivajinagar / FC Road, Pune') : undefined,
+      department: role === 'official' ? (existing?.department || 'Road Works & Infrastructure') : undefined,
+      employeeId: role === 'official' ? (existing?.employeeId || 'PMC-OFF-8842') : undefined,
+      role: role,
+      isDemo: false,
+    };
+    AuthService.setCurrentUser(userProfile);
+
+    setTimeout(() => {
+      setIsLoading(false);
+      setSuccessMsg(`Welcome back, ${userProfile.name}!`);
+      setTimeout(() => {
+        onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess(role, userProfile);
+        }
+      }, 700);
+    }, 600);
+  };
+
+  const handleSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    resetErrors();
+
+    if (!fullName.trim()) {
+      setErrorMsg('Please enter your full name.');
+      return;
+    }
+    if (!signUpEmail.trim() || !signUpEmail.includes('@')) {
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+    if (signUpPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+    if (signUpPassword !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify.');
+      return;
+    }
+    if (!agreeTerms) {
+      setErrorMsg('You must agree to the Terms of Service & CivicFix Privacy Policy.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const userProfile: UserProfile = {
+      name: fullName.trim(),
+      email: signUpEmail.trim(),
+      phone: signUpPhone.trim() || undefined,
+      ward: role === 'citizen' ? selectedWard : undefined,
+      department: role === 'official' ? selectedDept : undefined,
+      employeeId: role === 'official' ? (employeeId.trim() || 'PMC-OFF-' + Math.floor(1000 + Math.random() * 9000)) : undefined,
+      role: role,
+      isDemo: false,
+    };
+    AuthService.setCurrentUser(userProfile);
+
+    setTimeout(() => {
+      setIsLoading(false);
+      setSuccessMsg(`Account created! Welcome to CivicFix, ${fullName.trim()}.`);
+      setTimeout(() => {
+        onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess(role, userProfile);
+        }
+      }, 800);
+    }, 700);
   };
 
   const handleDemoLogin = (demoRole: 'citizen' | 'official') => {
     setRole(demoRole);
-    if (demoRole === 'citizen') {
-      setIdentifier('+91 98765 43210 (Citizen Demo)');
-    } else {
-      setIdentifier('officer.kulkarni@pmc.punecorp.in (Authority Demo)');
-    }
-    setOtpSent(true);
-    setOtp('1234');
-    setLoggedIn(true);
-    onClose();
-    if (onLoginSuccess) {
-      onLoginSuccess(demoRole);
-    }
+    resetErrors();
+    setIsLoading(true);
+
+    const demoProfile: UserProfile = demoRole === 'citizen' ? {
+      name: 'Aarav Deshmukh (Demo Citizen)',
+      email: 'aarav.demo@civicfix.in',
+      phone: '+91 98765 43210',
+      ward: 'Ward 12 - Shivajinagar / FC Road, Pune',
+      role: 'citizen',
+      isDemo: true,
+    } : {
+      name: 'Officer Kulkarni (Demo Officer)',
+      email: 'officer.kulkarni@pmc.punecorp.in',
+      ward: 'Pune Municipal Corp (PMC) — Central Zone',
+      department: 'PMC Road Works & Infrastructure',
+      employeeId: 'PMC-OFF-8842',
+      role: 'official',
+      isDemo: true,
+    };
+    AuthService.setCurrentUser(demoProfile);
+
+    setTimeout(() => {
+      setIsLoading(false);
+      setSuccessMsg(`Logged in with ${demoRole === 'citizen' ? 'Citizen' : 'Municipal Officer'} Demo credentials.`);
+      setTimeout(() => {
+        onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess(demoRole, demoProfile);
+        }
+      }, 400);
+    }, 400);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full max-w-md bg-white dark:bg-[#0B192C] border-2 border-deepTeal-500 dark:border-deepTeal-600 rounded-3xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg bg-white dark:bg-[#0A1628] border border-slate-200 dark:border-[#1E355B] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-6 transition-all duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-slate-100 dark:bg-[#0F1E33] px-6 py-4 border-b border-slate-200 dark:border-[#1E355B] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-deepTeal-50 dark:bg-deepTeal-950 border border-deepTeal-200 dark:border-deepTeal-600 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-deepTeal-600 dark:text-softMint-400" />
+        <div className="bg-slate-50 dark:bg-[#0F1E33] px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-[#1E355B] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-deepTeal-600 to-softMint-400 p-[1px] shadow-sm flex items-center justify-center">
+              <div className="w-full h-full bg-white dark:bg-[#081220] rounded-[11px] flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-deepTeal-600 dark:text-softMint-400" />
+              </div>
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">CivicFix Portal Access</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Citizen & PMC Officer Authentication</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                {authMode === 'signin' ? 'Welcome Back' : 'Create CivicFix Account'}
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {role === 'citizen' ? 'Citizen Portal Access' : 'Municipal Authority Workspace'}
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-white dark:bg-[#081220] border border-slate-300 dark:border-[#162846] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            className="p-1.5 rounded-lg bg-white dark:bg-[#081220] border border-slate-200 dark:border-[#162846] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
-          {!loggedIn ? (
-            <>
-              {/* Role Switcher Tabs */}
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-[#081220] border border-slate-200 dark:border-[#162846]">
-                <button
-                  onClick={() => {
-                    setRole('citizen');
-                    setOtpSent(false);
-                  }}
-                  className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                    role === 'citizen'
-                      ? 'bg-deepTeal-600 text-slate-950 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Citizen Login</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setRole('official');
-                    setOtpSent(false);
-                  }}
-                  className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                    role === 'official'
-                      ? 'bg-deepTeal-600 text-slate-950 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Building className="w-3.5 h-3.5" />
-                  <span>Authority Portal</span>
-                </button>
+        {/* Modal Body */}
+        <div className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+          
+          {/* Sign In / Sign Up Mode Switcher */}
+          <div className="flex border-b border-slate-200 dark:border-[#1E355B] pb-3 justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signin');
+                  resetErrors();
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  authMode === 'signin'
+                    ? 'bg-deepTeal-600 text-white dark:text-slate-950 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Log In</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signup');
+                  resetErrors();
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  authMode === 'signup'
+                    ? 'bg-deepTeal-600 text-white dark:text-slate-950 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Sign Up</span>
+              </button>
+            </div>
+
+            {/* Role indicator pill */}
+            <span className="text-[11px] font-semibold text-deepTeal-700 dark:text-softMint-400 bg-deepTeal-50 dark:bg-deepTeal-950/80 px-2 py-0.5 rounded border border-deepTeal-200 dark:border-deepTeal-700/50">
+              {role === 'citizen' ? '👤 Citizen Role' : '🏛️ Authority Role'}
+            </span>
+          </div>
+
+          {/* Role Switcher Tabs */}
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-[#081220] border border-slate-200 dark:border-[#162846]">
+            <button
+              type="button"
+              onClick={() => {
+                setRole('citizen');
+                resetErrors();
+              }}
+              className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                role === 'citizen'
+                  ? 'bg-white dark:bg-[#0F1E33] text-deepTeal-700 dark:text-softMint-300 shadow-sm border border-slate-200 dark:border-[#1E355B]'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Resident / Citizen</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('official');
+                resetErrors();
+              }}
+              className={`py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                role === 'official'
+                  ? 'bg-white dark:bg-[#0F1E33] text-amber-600 dark:text-amber-400 shadow-sm border border-slate-200 dark:border-[#1E355B]'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Municipal Officer</span>
+            </button>
+          </div>
+
+          {/* Error Message Display */}
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs flex items-center gap-2 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Success Message Display */}
+          {successMsg && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in duration-200">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Quick Demo Access Bar */}
+          <div className="p-2.5 bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#1E355B] rounded-xl flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              ⚡ Instant Demo:
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('citizen')}
+                className="py-1 px-2 rounded-md bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-700/60 text-teal-800 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/80 text-[10px] font-bold transition-colors"
+              >
+                Citizen Demo
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('official')}
+                className="py-1 px-2 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/80 text-[10px] font-bold transition-colors"
+              >
+                Officer Demo
+              </button>
+            </div>
+          </div>
+
+          {/* SIGN IN FORM */}
+          {authMode === 'signin' && (
+            <form onSubmit={handleSignIn} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  {role === 'citizen' ? 'Email Address or Mobile Number' : 'Official Email / Officer ID'}
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    {role === 'citizen' ? <Mail className="w-4 h-4" /> : <Briefcase className="w-4 h-4" />}
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={signInIdentifier}
+                    onChange={(e) => setSignInIdentifier(e.target.value)}
+                    placeholder={
+                      role === 'citizen'
+                        ? 'citizen@example.com or +91 98765 43210'
+                        : 'officer.kulkarni@pmc.punecorp.in'
+                    }
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                  />
+                </div>
               </div>
 
-              {/* Demo Accounts Quick-Access */}
-              <div className="p-3 bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#1E355B] rounded-xl space-y-2">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
-                  ⚡ Quick Demo Login
-                </span>
-                <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Password
+                  </label>
                   <button
                     type="button"
-                    onClick={() => handleDemoLogin('citizen')}
-                    className="py-2 px-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-700/60 text-slate-800 dark:text-teal-200 hover:bg-teal-100 dark:hover:bg-teal-900/80 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+                    onClick={() => alert('Password reset link sent to your registered email/phone.')}
+                    className="text-[11px] text-deepTeal-600 dark:text-softMint-400 hover:underline"
                   >
-                    <User className="w-3.5 h-3.5 text-deepTeal-600 dark:text-teal-400 shrink-0" />
-                    <span className="truncate">Citizen Demo</span>
+                    Forgot Password?
                   </button>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showSignInPassword ? 'text' : 'password'}
+                    required
+                    value={signInPassword}
+                    onChange={(e) => setSignInPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                  />
                   <button
                     type="button"
-                    onClick={() => handleDemoLogin('official')}
-                    className="py-2 px-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 text-slate-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/80 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+                    onClick={() => setShowSignInPassword(!showSignInPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label="Toggle password visibility"
                   >
-                    <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span className="truncate">Authority Demo</span>
+                    {showSignInPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {!otpSent ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                      {role === 'citizen' ? 'Mobile Number / Citizen ID' : 'Gov Employee ID / Nodal Email'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder={role === 'citizen' ? '+91 98765 43210' : 'officer.kulkarni@pmc.punecorp.in'}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:border-deepTeal-500"
-                    />
-                  </div>
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded text-deepTeal-600 focus:ring-deepTeal-500 dark:bg-[#081220] border-slate-300 dark:border-[#1E355B]"
+                  />
+                  <span className="text-xs text-slate-600 dark:text-slate-300">Remember this device</span>
+                </label>
+              </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-deepTeal-600 to-softMint-500 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Request One-Time Code</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerify} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-mono uppercase text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                      Enter 4-Digit Verification Code
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      required
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      placeholder="1 2 3 4"
-                      className="w-full text-center tracking-widest font-mono text-xl px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-deepTeal-500 text-deepTeal-700 dark:text-softMint-300 focus:outline-none"
-                    />
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-1 text-center">
-                      Simulated code sent to: {identifier || 'your device'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-xl bg-deepTeal-600 hover:bg-deepTeal-500 text-slate-950 font-bold text-sm transition-all"
-                  >
-                    Verify & Enter Dashboard
-                  </button>
-                </form>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-4 space-y-4">
-              <CheckCircle2 className="w-12 h-12 text-status-success mx-auto" />
-              <h4 className="text-lg font-bold text-slate-900 dark:text-white">
-                Welcome to CivicFix {role === 'citizen' ? 'Citizen Hub' : 'Authority Console'}
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                You are authenticated. Redirecting to your Pune municipal live workspace...
-              </p>
               <button
-                onClick={() => {
-                  onClose();
-                  if (onLoginSuccess) onLoginSuccess(role);
-                }}
-                className="w-full py-2.5 rounded-xl bg-deepTeal-600 text-slate-950 font-bold text-xs"
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-deepTeal-600 via-deepTeal-500 to-softMint-400 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
               >
-                Go to Dashboard
+                {isLoading ? (
+                  <span>Signing In...</span>
+                ) : (
+                  <>
+                    <span>Log In to {role === 'citizen' ? 'Citizen Hub' : 'Authority Console'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
-            </div>
+
+              <div className="text-center pt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Don't have an account yet?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('signup');
+                      resetErrors();
+                    }}
+                    className="font-bold text-deepTeal-600 dark:text-softMint-400 hover:underline"
+                  >
+                    Create an account
+                  </button>
+                </p>
+              </div>
+            </form>
           )}
+
+          {/* SIGN UP FORM */}
+          {authMode === 'signup' && (
+            <form onSubmit={handleSignUp} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g. Rahul Sharma"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={signUpEmail}
+                      onChange={(e) => setSignUpEmail(e.target.value)}
+                      placeholder="name@email.com"
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={signUpPhone}
+                      onChange={(e) => setSignUpPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Role Specific Registration Fields */}
+              {role === 'citizen' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Primary Residential Ward / Zone
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <select
+                      value={selectedWard}
+                      onChange={(e) => setSelectedWard(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500 focus:ring-1 focus:ring-deepTeal-500 transition-colors"
+                    >
+                      <optgroup label="📍 Pune Municipal Corporation (PMC)">
+                        <option value="Ward 12 - Shivajinagar">Ward 12 - Shivajinagar / FC Road / JM Road</option>
+                        <option value="Ward 8 - Kothrud">Ward 8 - Kothrud & Karve Nagar</option>
+                        <option value="Ward 15 - Aundh">Ward 15 - Aundh, Baner & Balewadi</option>
+                        <option value="Ward 22 - Viman Nagar">Ward 22 - Viman Nagar & Kalyani Nagar</option>
+                        <option value="Ward 7 - Koregaon Park">Ward 7 - Koregaon Park & Bund Garden</option>
+                        <option value="Ward 19 - Hadapsar">Ward 19 - Hadapsar & Magarpatta City</option>
+                        <option value="Ward 5 - Camp Area">Ward 5 - MG Road, Camp Area & Cantonment</option>
+                        <option value="Ward 14 - Deccan">Ward 14 - Deccan Gymkhana & Prabhat Road</option>
+                        <option value="Ward 3 - Swargate / Mandai">Ward 3 - Swargate, Shukrawar Peth & Mandai</option>
+                        <option value="Ward 18 - Kharadi">Ward 18 - Kharadi & Wagholi</option>
+                        <option value="Ward 31 - Pashan / Bavdhan">Ward 31 - Pashan & Bavdhan</option>
+                        <option value="Ward 10 - Sinhagad Road">Ward 10 - Sinhagad Road, Vadgaon & Dhayari</option>
+                        <option value="Ward 25 - Katraj">Ward 25 - Katraj, Ambegaon & Dhankawadi</option>
+                        <option value="Ward 2 - Bibwewadi">Ward 2 - Bibwewadi & Sahakar Nagar</option>
+                        <option value="Ward 16 - Yerwada">Ward 16 - Yerwada & Vishrantwadi</option>
+                        <option value="Ward 28 - Dhanori">Ward 28 - Dhanori & Lohegaon</option>
+                        <option value="Ward 21 - Warje">Ward 21 - Warje & Kothrud Extension</option>
+                        <option value="Ward 4 - Kasba Peth">Ward 4 - Kasba Peth & Shaniwar Wada</option>
+                      </optgroup>
+                      <optgroup label="🏭 Pimpri Chinchwad (PCMC)">
+                        <option value="PCMC - Hinjawadi">PCMC - Hinjawadi IT Park / Phase 1-3</option>
+                        <option value="PCMC - Wakad">PCMC - Wakad & Pimple Saudagar</option>
+                        <option value="PCMC - Nigdi">PCMC - Nigdi & Pradhikaran</option>
+                        <option value="PCMC - Ravet">PCMC - Ravet & Punawale</option>
+                        <option value="PCMC - Pimple Nilakh">PCMC - Pimple Nilakh & Pimple Gurav</option>
+                      </optgroup>
+                      <optgroup label="🏙️ Other Major Cities & Metros">
+                        <option value="Mumbai - Bandra / Andheri">Mumbai - Bandra, Andheri & Juhu (BMC)</option>
+                        <option value="Mumbai - South Mumbai">Mumbai - Nariman Point & Colaba (BMC)</option>
+                        <option value="Navi Mumbai - Vashi">Navi Mumbai - Vashi & Belapur (NMMC)</option>
+                        <option value="Thane - Ghodbunder">Thane - Ghodbunder Road & Majiwada (TMC)</option>
+                        <option value="Nagpur - Civil Lines">Nagpur - Civil Lines & Dharampeth (NMC)</option>
+                        <option value="Nashik - Panchavati">Nashik - Panchavati & Gangapur Road (NMC)</option>
+                        <option value="Bengaluru - Central / IT Corridor">Bengaluru - Indiranagar, Whitefield & Koramangala (BBMP)</option>
+                        <option value="Delhi NCR - Central / South">Delhi NCR - Connaught Place & South Delhi (MCD)</option>
+                        <option value="Hyderabad - HITEC City">Hyderabad - HITEC City & Gachibowli (GHMC)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Department
+                    </label>
+                    <select
+                      value={selectedDept}
+                      onChange={(e) => setSelectedDept(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-deepTeal-500"
+                    >
+                      <option value="Road Works & Infrastructure">Road Works & Infrastructure</option>
+                      <option value="Water Supply & Sewage">Water Supply & Sewage</option>
+                      <option value="Sanitation & Solid Waste">Sanitation & Solid Waste</option>
+                      <option value="Electrical & Public Lighting">Electrical & Public Lighting</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Officer / Employee ID
+                    </label>
+                    <input
+                      type="text"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      placeholder="e.g. PMC-OFF-8842"
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-deepTeal-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Create Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showSignUpPassword ? 'text' : 'password'}
+                      required
+                      value={signUpPassword}
+                      onChange={(e) => setSignUpPassword(e.target.value)}
+                      placeholder="Min 6 chars"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showSignUpPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showSignUpPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat password"
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-300 dark:border-[#1E355B] text-slate-900 dark:text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-deepTeal-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-deepTeal-600 focus:ring-deepTeal-500 dark:bg-[#081220] border-slate-300 dark:border-[#1E355B]"
+                  />
+                  <span className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
+                    I agree to the CivicFix Terms of Service, Public Community Guidelines, and Privacy Policy.
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-deepTeal-600 via-deepTeal-500 to-softMint-400 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+              >
+                {isLoading ? (
+                  <span>Creating Account...</span>
+                ) : (
+                  <>
+                    <span>Complete Registration</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('signin');
+                      resetErrors();
+                    }}
+                    className="font-bold text-deepTeal-600 dark:text-softMint-400 hover:underline"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              </div>
+            </form>
+          )}
+
         </div>
       </div>
     </div>
   );
 };
-

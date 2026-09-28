@@ -15,22 +15,27 @@ import { LoginModal } from './components/LoginModal';
 import { DashboardPage } from './dashboard/DashboardPage';
 import { AuthorityDashboardPage } from './dashboard/authority/AuthorityDashboardPage';
 
+import { AuthService, type UserProfile } from './services/authService';
+
 export const AppContent: React.FC = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [trackModalOpen, setTrackModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
   const [userRole, setUserRole] = useState<'citizen' | 'official'>('citizen');
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => AuthService.getCurrentUser());
 
   if (view === 'dashboard') {
     return (
       <div className="w-full min-h-screen bg-slate-50 dark:bg-[#081220] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         {userRole === 'official' ? (
           <AuthorityDashboardPage
+            currentUser={currentUser}
             onBackToLanding={() => setView('landing')}
           />
         ) : (
           <DashboardPage
+            currentUser={currentUser}
             onOpenReportModal={() => setReportModalOpen(true)}
             onOpenTrackModal={() => setTrackModalOpen(true)}
             onBackToLanding={() => setView('landing')}
@@ -48,8 +53,11 @@ export const AppContent: React.FC = () => {
         <LoginModal
           isOpen={loginModalOpen}
           onClose={() => setLoginModalOpen(false)}
-          onLoginSuccess={(role) => {
+          onLoginSuccess={(role, profile) => {
             setUserRole(role);
+            if (profile) {
+              setCurrentUser(profile);
+            }
             setView('dashboard');
           }}
         />
@@ -59,12 +67,11 @@ export const AppContent: React.FC = () => {
 
   return (
     <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#081220] text-slate-900 dark:text-slate-100 font-sans relative selection:bg-deepTeal-600 selection:text-white transition-colors duration-300">
-      {/* Top Fixed Navigation with Theme Toggle and Home/Dashboard link */}
+      {/* Top Fixed Navigation with Theme Toggle */}
       <Navbar
         onOpenReportModal={() => setReportModalOpen(true)}
         onOpenTrackModal={() => setTrackModalOpen(true)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
-        onNavigateToDashboard={() => setLoginModalOpen(true)}
       />
 
       {/* Main Page Sections */}
