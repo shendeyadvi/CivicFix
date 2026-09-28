@@ -14,7 +14,10 @@ import { ReportingFlowPreview } from "./components/ReportingFlowPreview";
 import { ContributionCard } from "./components/ContributionCard";
 import { DashboardFooter } from "./components/DashboardFooter";
 
+import { AuthService, type UserProfile } from "../services/authService";
+
 interface DashboardPageProps {
+  currentUser?: UserProfile | null;
   onOpenReportModal?: (category?: string) => void;
   onOpenTrackModal?: (trackingId?: string) => void;
   onBackToLanding?: () => void;
@@ -169,11 +172,15 @@ const TAB_TITLES: Record<string, string> = {
 };
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
+  currentUser,
   onOpenReportModal,
   onOpenTrackModal,
   onBackToLanding,
 }) => {
   const [activeTab, setActiveTab] = useState("home");
+  const user = currentUser || AuthService.getCurrentUser();
+  const userName = user?.name || "Citizen Resident";
+  const userWard = user?.ward || "Ward 12 · Shivajinagar / FC Road, Pune";
 
   const handleOpenReport = (category?: string) => {
     if (onOpenReportModal) onOpenReportModal(category);
@@ -212,6 +219,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     <div className="min-h-screen bg-slate-50 dark:bg-[#081220] text-slate-900 dark:text-slate-100 font-sans flex antialiased selection:bg-[#0F766E] selection:text-white transition-colors duration-300">
       <Sidebar
         activeTab={activeTab}
+        currentUser={user}
         onSelectTab={handleSelectTab}
         onOpenReport={() => handleOpenReport()}
         onBackToLanding={onBackToLanding}
@@ -220,6 +228,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         <MobileHeader
           activeTab={activeTab}
+          currentUser={user}
           onSelectTab={handleSelectTab}
           onOpenReport={() => handleOpenReport()}
           onBackToLanding={onBackToLanding}
@@ -227,8 +236,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
         <div className="hidden lg:block">
           <Header
-            userName="Aarav Deshmukh"
-            wardName={`FC Road / Shivajinagar, Ward 12, Pune — ${TAB_TITLES[activeTab] ?? "Dashboard"}`}
+            userName={userName}
+            wardName={`${userWard} — ${TAB_TITLES[activeTab] ?? "Dashboard"}`}
             onOpenReport={() => handleOpenReport()}
             onOpenTrack={() => handleOpenTrack()}
           />

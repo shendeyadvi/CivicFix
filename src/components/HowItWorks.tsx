@@ -31,7 +31,7 @@ export const HowItWorks: React.FC<HowItWorksProps> = ({ onOpenReportModal }) => 
   };
 
   return (
-    <section id="how-it-works" className="py-20 lg:py-28 relative bg-slate-50 dark:bg-[#081220] overflow-hidden transition-colors duration-300">
+    <section id="how-it-works" className="pt-8 pb-16 lg:pt-12 lg:pb-24 relative bg-slate-50 dark:bg-[#081220] overflow-hidden transition-colors duration-300">
       {/* Background ambient lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] glow-teal-radial pointer-events-none opacity-50 dark:opacity-100" />
 

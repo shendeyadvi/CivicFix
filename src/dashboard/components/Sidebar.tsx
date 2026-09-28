@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { ReportsService } from '../../services/reportsService';
+import { AuthService, type UserProfile } from '../../services/authService';
 
 interface SidebarProps {
   activeTab: string;
+  currentUser?: UserProfile | null;
   onSelectTab: (tab: string) => void;
   onOpenReport: () => void;
   onBackToLanding?: () => void;
@@ -24,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
+  currentUser,
   onSelectTab,
   onOpenReport,
   onBackToLanding
@@ -144,8 +147,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jurisdiction</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <div className="font-bold text-slate-900 dark:text-white text-xs">Ward 14 · Civil Lines</div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">PMC Municipal Zone 3</div>
+            <div className="font-bold text-slate-900 dark:text-white text-xs truncate">
+              {currentUser?.ward || 'Ward 12 · Shivajinagar'}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+              {currentUser?.isDemo ? 'Demo Jurisdiction' : 'Registered Area'}
+            </div>
             <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-200 dark:border-slate-800">
               <span>Active Issues:</span>
               <span className="font-bold text-slate-700 dark:text-slate-300">{reportCount}</span>
@@ -188,11 +195,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="pt-2 border-t border-slate-200 dark:border-slate-800/60 flex items-center justify-between px-2 py-1">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
-              AD
+              {AuthService.getInitials(currentUser?.name || 'Citizen User')}
             </div>
             <div className="truncate">
-              <div className="font-bold text-xs text-slate-900 dark:text-white truncate">Aarav Deshmukh</div>
-              <div className="text-[10px] text-slate-400 truncate">Verified Citizen</div>
+              <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                {currentUser?.name || 'Citizen User'}
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                {currentUser?.isDemo ? 'Demo Citizen' : 'Verified Citizen'}
+              </div>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />

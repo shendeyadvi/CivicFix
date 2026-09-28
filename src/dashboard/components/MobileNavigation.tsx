@@ -13,8 +13,11 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
+import { AuthService, type UserProfile } from '../../services/authService';
+
 interface MobileNavigationProps {
   activeTab: string;
+  currentUser?: UserProfile | null;
   onSelectTab: (tab: string) => void;
   onOpenReport: () => void;
   onOpenNotifications?: () => void;
@@ -22,6 +25,7 @@ interface MobileNavigationProps {
 }
 
 export const MobileHeader: React.FC<MobileNavigationProps> = ({
+  currentUser,
   onOpenNotifications,
   onBackToLanding
 }) => {
@@ -44,7 +48,9 @@ export const MobileHeader: React.FC<MobileNavigationProps> = ({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="font-black text-lg text-slate-900 dark:text-white tracking-tight">Civic<span className="text-[#0F766E] dark:text-[#2DD4BF]">Fix</span></span>
-          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-500/20">Citizen</span>
+          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-500/20">
+            {currentUser?.isDemo ? 'Demo' : 'Citizen'}
+          </span>
         </div>
       </div>
 
@@ -71,7 +77,7 @@ export const MobileHeader: React.FC<MobileNavigationProps> = ({
         </button>
 
         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0F766E] to-[#14B8A6] dark:to-[#2DD4BF] flex items-center justify-center text-white dark:text-[#081220] font-bold text-xs shadow-xs">
-          Y
+          {AuthService.getInitials(currentUser?.name || 'Citizen User')}
         </div>
       </div>
     </header>

@@ -16,15 +16,23 @@ import {
   Calendar
 } from 'lucide-react';
 
+import { AuthService, type UserProfile } from '../../services/authService';
+
 interface AuthorityDashboardPageProps {
+  currentUser?: UserProfile | null;
   onBackToLanding?: () => void;
 }
 
 export const AuthorityDashboardPage: React.FC<AuthorityDashboardPageProps> = ({
+  currentUser,
   onBackToLanding,
 }) => {
   const [activeTab, setActiveTab] = useState<AuthorityTab>('dashboard');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const user = currentUser || AuthService.getCurrentUser();
+  const officerName = user?.name || 'Officer Kulkarni';
+  const officerDept = user?.department || 'PMC Roads & Infrastructure';
+  const isDemo = user?.isDemo ?? (!user);
 
   const handleSelectStatFilter = (filter: string) => {
     setStatusFilter(filter);
@@ -70,10 +78,10 @@ export const AuthorityDashboardPage: React.FC<AuthorityDashboardPageProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Good morning, Officer Kulkarni.
+                  Good morning, {officerName}.
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                  PMC Admin Officer
+                  {isDemo ? 'Demo Officer' : officerDept}
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
