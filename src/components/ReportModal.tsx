@@ -154,23 +154,42 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setIsGettingLocation(true);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude.toFixed(4);
-          const lng = pos.coords.longitude.toFixed(4);
-          setGpsCoords(`${lat}° N, ${lng}° E`);
-          setLocation(`FC Road, Near Goodluck Cafe, Shivajinagar, Ward 12, Pune (GPS Geotagged)`);
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const latStr = lat.toFixed(4);
+          const lngStr = lng.toFixed(4);
+          const latDir = lat >= 0 ? 'N' : 'S';
+          const lngDir = lng >= 0 ? 'E' : 'W';
+          setGpsCoords(`${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lng).toFixed(4)}° ${lngDir}`);
+
+          // Reverse geocode to get actual address
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latStr}&lon=${lngStr}&addressdetails=1`,
+              { headers: { 'Accept-Language': 'en' } }
+            );
+            const data = await response.json();
+            if (data && data.display_name) {
+              setLocation(`${data.display_name} (GPS Geotagged)`);
+            } else {
+              setLocation(`Lat: ${latStr}, Lng: ${lngStr} (GPS Geotagged)`);
+            }
+          } catch {
+            setLocation(`Lat: ${latStr}, Lng: ${lngStr} (GPS Geotagged)`);
+          }
           setIsGettingLocation(false);
         },
-        () => {
-          // Fallback location for Pune
-          setGpsCoords(`18.5204° N, 73.8415° E`);
-          setLocation(`FC Road, Near Goodluck Cafe, Shivajinagar, Ward 12, Pune (GPS Live)`);
+        (error) => {
+          setGpsCoords('');
+          setLocation('Unable to detect location. Please enter manually.');
           setIsGettingLocation(false);
-        }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      setGpsCoords(`18.5204° N, 73.8415° E`);
-      setLocation(`FC Road, Near Goodluck Cafe, Shivajinagar, Ward 12, Pune (GPS Live)`);
+      setGpsCoords('');
+      setLocation('Geolocation not supported. Please enter manually.');
       setIsGettingLocation(false);
     }
   };
@@ -186,6 +205,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         location,
         description: description || 'Citizen reported issue via CivicFix app.',
         priority,
+        image: photoPreview || undefined,
       });
       setGeneratedTicketId(created.trackingId);
       setIsSubmitting(false);

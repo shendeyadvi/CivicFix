@@ -243,17 +243,36 @@ export const IssueStatusPreview: React.FC<IssueStatusPreviewProps> = ({
                 </div>
               </div>
 
-              {/* Photo Evidence Thumbnail simulation */}
-              <div className="md:col-span-4 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#162846] p-4 text-center flex flex-col items-center justify-center min-h-[140px]">
-                <div className="w-10 h-10 rounded-full bg-deepTeal-50 dark:bg-deepTeal-950 border border-deepTeal-200 dark:border-deepTeal-700 flex items-center justify-center mb-2">
-                  <Camera className="w-5 h-5 text-deepTeal-600 dark:text-deepTeal-400" />
-                </div>
-                <span className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">
-                  Geo-Tagged Field Photo
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Location verified by GPS
-                </span>
+              {/* Photo Evidence Thumbnail */}
+              <div className="md:col-span-4 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#162846] p-2 text-center flex flex-col items-center justify-center min-h-[140px] overflow-hidden">
+                {currentIssue.image ? (
+                  <div className="w-full h-full flex flex-col items-center">
+                    <img
+                      src={currentIssue.image}
+                      alt="Geo-Tagged Field Photo"
+                      className="w-full h-28 object-cover rounded-lg mb-2"
+                    />
+                    <div className="flex items-center justify-between w-full px-1">
+                      <span className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                        <Camera className="w-3 h-3 text-deepTeal-600 dark:text-softMint-400" />
+                        Uploaded Photo
+                      </span>
+                      <span className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">GPS Verified</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2 flex flex-col items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-deepTeal-50 dark:bg-deepTeal-950 border border-deepTeal-200 dark:border-deepTeal-700 flex items-center justify-center mb-2">
+                      <Camera className="w-5 h-5 text-deepTeal-600 dark:text-deepTeal-400" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">
+                      Geo-Tagged Field Photo
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Location verified by GPS
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

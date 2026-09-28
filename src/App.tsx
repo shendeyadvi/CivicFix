@@ -20,6 +20,7 @@ import { AuthService, type UserProfile } from './services/authService';
 export const AppContent: React.FC = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [trackModalOpen, setTrackModalOpen] = useState(false);
+  const [trackingIdForTrack, setTrackingIdForTrack] = useState<string | undefined>(undefined);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
   const [userRole, setUserRole] = useState<'citizen' | 'official'>('citizen');
@@ -37,7 +38,10 @@ export const AppContent: React.FC = () => {
           <DashboardPage
             currentUser={currentUser}
             onOpenReportModal={() => setReportModalOpen(true)}
-            onOpenTrackModal={() => setTrackModalOpen(true)}
+            onOpenTrackModal={(trackingId?: string) => {
+              setTrackingIdForTrack(trackingId);
+              setTrackModalOpen(true);
+            }}
             onBackToLanding={() => setView('landing')}
           />
         )}
@@ -48,7 +52,8 @@ export const AppContent: React.FC = () => {
         />
         <TrackModal
           isOpen={trackModalOpen}
-          onClose={() => setTrackModalOpen(false)}
+          onClose={() => { setTrackModalOpen(false); setTrackingIdForTrack(undefined); }}
+          initialTrackingId={trackingIdForTrack}
         />
         <LoginModal
           isOpen={loginModalOpen}
@@ -121,8 +126,11 @@ export const AppContent: React.FC = () => {
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
-        onLoginSuccess={(role) => {
+        onLoginSuccess={(role, profile) => {
           setUserRole(role);
+          if (profile) {
+            setCurrentUser(profile);
+          }
           setView('dashboard');
         }}
       />

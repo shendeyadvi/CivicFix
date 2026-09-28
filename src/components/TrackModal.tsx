@@ -1,15 +1,71 @@
-import React, { useState } from 'react';
-import { X, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Search, ImageIcon } from 'lucide-react';
 import { HERO_MAP_ISSUES, type CivicIssue } from '../data/mockData';
+import { ReportsService } from '../services/reportsService';
 
 interface TrackModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTrackingId?: string;
 }
 
-export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose }) => {
+export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initialTrackingId }) => {
   const [searchId, setSearchId] = useState<string>('CF-2026-8942');
   const [matchedIssue, setMatchedIssue] = useState<CivicIssue>(HERO_MAP_ISSUES[0]);
+  const [reportImage, setReportImage] = useState<string | null>(null);
+  const autoSearchDone = useRef<string | undefined>(undefined);
+
+  // Auto-search when opened with an initialTrackingId
+  useEffect(() => {
+    if (isOpen && initialTrackingId && autoSearchDone.current !== initialTrackingId) {
+      autoSearchDone.current = initialTrackingId;
+      setSearchId(initialTrackingId);
+      // Trigger search programmatically
+      const query = initialTrackingId.trim().toUpperCase();
+      const found = HERO_MAP_ISSUES.find(
+        (i) => i.trackingId.toUpperCase() === query || i.id.toLowerCase() === query.toLowerCase()
+      );
+      if (found) {
+        setMatchedIssue(found);
+        setReportImage(null);
+      } else {
+        const userReports = ReportsService.getReports();
+        const userReport = userReports.find(
+          (r) => r.trackingId.toUpperCase() === query || r.id.toLowerCase() === query.toLowerCase()
+        );
+        if (userReport) {
+          setMatchedIssue({
+            id: userReport.id,
+            trackingId: userReport.trackingId,
+            title: userReport.title,
+            category: userReport.category as CivicIssue['category'],
+            location: userReport.location,
+            mapQuery: '',
+            coordinates: { x: 50, y: 50 },
+            reportedDate: userReport.date,
+            status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
+            statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
+            priority: userReport.priority,
+            department: userReport.department,
+            assignedOfficer: userReport.assignedTo,
+            estimatedFixTime: '48 Hours',
+            description: userReport.description,
+            upvotes: userReport.upvotes,
+            timeline: [
+              { step: 'Report Submitted', date: userReport.date, completed: true },
+              { step: 'Issue Verification', date: 'Pending', completed: false },
+              { step: 'Team Assignment', date: 'Pending', completed: false },
+              { step: 'Issue Resolved', date: 'Pending', completed: false },
+            ],
+          });
+          setReportImage(userReport.image || null);
+        }
+      }
+    }
+    if (!isOpen) {
+      autoSearchDone.current = undefined;
+    }
+  }, [isOpen, initialTrackingId]);
 
   if (!isOpen) return null;
 
@@ -21,12 +77,48 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose }) => {
     );
     if (found) {
       setMatchedIssue(found);
+      setReportImage(null);
     } else {
-      // Default to first with updated ID if not found in mock list
-      setMatchedIssue({
-        ...HERO_MAP_ISSUES[0],
-        trackingId: query.startsWith('CF-') ? query : `CF-${query}`,
-      });
+      // Search user-submitted reports from ReportsService
+      const userReports = ReportsService.getReports();
+      const userReport = userReports.find(
+        (r) => r.trackingId.toUpperCase() === query || r.id.toLowerCase() === query.toLowerCase()
+      );
+      if (userReport) {
+        // Convert CivicReportItem to CivicIssue shape for display
+        setMatchedIssue({
+          id: userReport.id,
+          trackingId: userReport.trackingId,
+          title: userReport.title,
+          category: userReport.category as CivicIssue['category'],
+          location: userReport.location,
+          mapQuery: '',
+          coordinates: { x: 50, y: 50 },
+          reportedDate: userReport.date,
+          status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
+          statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
+          priority: userReport.priority,
+          department: userReport.department,
+          assignedOfficer: userReport.assignedTo,
+          estimatedFixTime: '48 Hours',
+          description: userReport.description,
+          upvotes: userReport.upvotes,
+          timeline: [
+            { step: 'Report Submitted', date: userReport.date, completed: true },
+            { step: 'Issue Verification', date: 'Pending', completed: false },
+            { step: 'Team Assignment', date: 'Pending', completed: false },
+            { step: 'Issue Resolved', date: 'Pending', completed: false },
+          ],
+        });
+        setReportImage(userReport.image || null);
+      } else {
+        // Default to first with updated ID if not found
+        setMatchedIssue({
+          ...HERO_MAP_ISSUES[0],
+          trackingId: query.startsWith('CF-') ? query : `CF-${query}`,
+        });
+        setReportImage(null);
+      }
     }
   };
 
@@ -92,6 +184,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose }) => {
                 onClick={() => {
                   setSearchId(issue.trackingId);
                   setMatchedIssue(issue);
+                  setReportImage(null);
                 }}
                 className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-deepTeal-700 dark:text-softMint-300 hover:text-deepTeal-900 dark:hover:text-white"
               >
@@ -144,6 +237,23 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose }) => {
                   <span className="text-slate-800 dark:text-slate-200 font-semibold">{matchedIssue.estimatedFixTime || '48 Hours'}</span>
                 </div>
               </div>
+
+              {/* Uploaded Image */}
+              {reportImage && (
+                <div className="pt-3 border-t border-slate-200 dark:border-[#162846]">
+                  <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono mb-3 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    Uploaded Evidence
+                  </h5>
+                  <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-[#1E355B]">
+                    <img
+                      src={reportImage}
+                      alt="Issue evidence"
+                      className="w-full max-h-56 object-cover"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Progress Steps */}
               <div className="pt-3 border-t border-slate-200 dark:border-[#162846]">

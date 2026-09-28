@@ -17,6 +17,7 @@ export interface CivicReportItem {
   lat: number;
   lng: number;
   upvotes: number;
+  image?: string;
 }
 
 const STORAGE_KEY = 'civicfix_reports_data';
@@ -224,6 +225,7 @@ export class ReportsService {
       lat: 18.5204 + (Math.random() * 0.04 - 0.02),
       lng: 73.8567 + (Math.random() * 0.04 - 0.02),
       upvotes: 1,
+      image: report.image,
     };
 
     const updated = [newReport, ...reports];
