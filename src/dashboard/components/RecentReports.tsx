@@ -9,7 +9,8 @@ import {
   ArrowRight,
   PlusCircle,
   Droplets,
-  ShieldAlert
+  ShieldAlert,
+  ImageIcon
 } from 'lucide-react';
 import { ReportsService, type CivicReportItem } from '../../services/reportsService';
 
@@ -118,6 +119,7 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               <th className="py-3 px-5">Issue / Category</th>
+              <th className="py-3 px-4">Photo</th>
               <th className="py-3 px-4">Location</th>
               <th className="py-3 px-4">Reported Date</th>
               <th className="py-3 px-4">Status</th>
@@ -149,6 +151,22 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
                         </div>
                       </div>
                     </div>
+                  </td>
+
+                  <td className="py-3.5 px-4">
+                    {item.image ? (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
+                        <img
+                          src={item.image}
+                          alt="Evidence"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                        <ImageIcon className="w-4 h-4 text-slate-400" />
+                      </div>
+                    )}
                   </td>
 
                   <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-medium">
@@ -244,6 +262,17 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Mobile Image Thumbnail */}
+              {item.image && (
+                <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 max-h-32">
+                  <img
+                    src={item.image}
+                    alt="Evidence"
+                    className="w-full h-28 object-cover"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 pt-1">
                 <div className="flex items-center gap-1.5 truncate max-w-[200px]">
