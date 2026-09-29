@@ -200,7 +200,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           }
           setIsGettingLocation(false);
         },
-        (error) => {
+        () => {
           setGpsCoords('');
           setLocation('Unable to detect location. Please enter manually.');
           setIsGettingLocation(false);
