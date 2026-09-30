@@ -37,23 +37,23 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: any = {};
     if (category && category !== 'All') {
-      where.category = { contains: String(category) };
+      where.category = { contains: String(category), mode: 'insensitive' };
     }
     if (status && status !== 'All') {
       where.status = String(status);
     }
     if (department && department !== 'All') {
-      where.department = { contains: String(department) };
+      where.department = { contains: String(department), mode: 'insensitive' };
     }
     if (ward && ward !== 'All') {
-      where.ward = { contains: String(ward) };
+      where.ward = { contains: String(ward), mode: 'insensitive' };
     }
     if (search) {
       where.OR = [
-        { title: { contains: String(search) } },
-        { trackingId: { contains: String(search) } },
-        { location: { contains: String(search) } },
-        { description: { contains: String(search) } },
+        { title: { contains: String(search), mode: 'insensitive' } },
+        { trackingId: { contains: String(search), mode: 'insensitive' } },
+        { location: { contains: String(search), mode: 'insensitive' } },
+        { description: { contains: String(search), mode: 'insensitive' } },
       ];
     }
 
