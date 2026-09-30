@@ -4,6 +4,7 @@ import {
   Camera,
   MapPin,
   AlertTriangle,
+  AlertCircle,
   Lightbulb,
   Trash2,
   Droplets,
@@ -97,6 +98,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState<boolean>(false);
   const [aiAnalyzed, setAiAnalyzed] = useState<boolean>(false);
+  const [aiRejectionReason, setAiRejectionReason] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [gpsCoords, setGpsCoords] = useState<string>('18.5204° N, 73.8415° E');
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const [generatedTicketId, setGeneratedTicketId] = useState<string>('CF-2026-9104');
@@ -116,45 +121,62 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const triggerAIAnalysis = async (samplePhoto?: SamplePhoto, fileUrl?: string, fileObj?: File) => {
     setIsAnalyzingAI(true);
     setAiAnalyzed(false);
+    setAiRejectionReason(null);
+    setAiError(null);
+    setAiConfidence(null);
 
-    if (samplePhoto) {
-      setPhotoPreview(samplePhoto.imagePreview);
-      setTitle(samplePhoto.title);
-      setDescription(samplePhoto.description);
-      setCategory(samplePhoto.category);
-      setDepartment(samplePhoto.department);
-      setPriority(samplePhoto.priority);
-      setIsAnalyzingAI(false);
-      setAiAnalyzed(true);
-      return;
-    }
-
-    if (fileUrl) {
-      setPhotoPreview(fileUrl);
+    const imagePreviewUrl = samplePhoto ? samplePhoto.imagePreview : fileUrl;
+    if (imagePreviewUrl) {
+      setPhotoPreview(imagePreviewUrl);
     }
 
     try {
-      const aiResult = await ReportsService.analyzeImage({
-        file: fileObj,
-        base64: fileUrl,
-        hint: category,
-      });
+      let aiResult;
+      if (fileObj) {
+        aiResult = await ReportsService.analyzeImage({ file: fileObj });
+      } else if (fileUrl) {
+        aiResult = await ReportsService.analyzeImage({ base64: fileUrl });
+      } else if (samplePhoto) {
+        aiResult = await ReportsService.analyzeImage({ imageUrl: samplePhoto.imagePreview });
+      }
 
       if (aiResult) {
-        setTitle(aiResult.title || 'Detected Civic Infrastructure Damage');
-        setDescription(aiResult.description || 'AI analyzed image and detected civic maintenance requirement.');
-        setCategory(aiResult.category || 'Roads & Potholes');
-        setDepartment(aiResult.department || 'Roads & Infrastructure');
-        setPriority(aiResult.priority || 'High');
-      } else {
-        setTitle('Detected Civic Infrastructure Damage');
-        setDescription('AI Vision Analysis: Detected infrastructure degradation requiring municipal repair dispatch.');
+        setAiConfidence(aiResult.confidence);
+
+        if (aiResult.isRelevant === false) {
+          // Irrelevant image rejected by Gemini Vision
+          setAiRejectionReason(
+            aiResult.reason ||
+            "This image doesn't appear to show a civic issue. Please upload a photo of a public problem such as a pothole, broken streetlight, water leakage, garbage, drainage issue, etc."
+          );
+          setAiAnalyzed(false);
+        } else {
+          // Relevant civic issue confirmed by Gemini Vision
+          setTitle(aiResult.title || 'Detected Civic Infrastructure Issue');
+          setDescription(aiResult.description || 'Visual analysis detected civic infrastructure maintenance requirement.');
+          if (aiResult.category) setCategory(aiResult.category);
+          if (aiResult.department) setDepartment(aiResult.department);
+          if (aiResult.severity || aiResult.priority) {
+            setPriority((aiResult.severity || aiResult.priority) as any);
+          }
+          setAiAnalyzed(true);
+          setAiRejectionReason(null);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('AI analysis error:', err);
+      let errMsg = err?.message || 'AI analysis is temporarily unavailable. Please try again later.';
+      try {
+        const parsed = JSON.parse(errMsg);
+        if (parsed?.error?.message) {
+          errMsg = parsed.error.message;
+        }
+      } catch {
+        // Not a JSON string
+      }
+      setAiError(errMsg);
     } finally {
       setIsAnalyzingAI(false);
-      setAiAnalyzed(true);
     }
   };
 
@@ -217,6 +239,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       const created = await ReportsService.addReport({
@@ -233,9 +256,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       if (onIssueCreated) {
         onIssueCreated(created.trackingId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Submit error:', err);
       setIsSubmitting(false);
+      setSubmitError(err?.message || 'Unable to connect to CivicFix server. Your report was not submitted.');
     }
   };
 
@@ -246,6 +270,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setDescription('');
     setPhotoPreview(null);
     setAiAnalyzed(false);
+    setAiRejectionReason(null);
+    setAiError(null);
+    setSubmitError(null);
+    setAiConfidence(null);
     onClose();
   };
 
@@ -460,14 +488,54 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     </div>
                   </div>
 
-                  {/* AI Auto-Fill Notification Badge */}
-                  {aiAnalyzed && (
+                  {/* AI Status & Feedback Banners */}
+                  {isAnalyzingAI && (
+                    <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center gap-3 text-xs animate-in fade-in">
+                      <Sparkles className="w-4 h-4 text-teal-600 dark:text-emerald-400 animate-spin" />
+                      <div className="flex-1">
+                        <span className="font-bold text-teal-900 dark:text-emerald-200">Gemini Vision is inspecting your photo...</span>
+                        <p className="text-[11px] text-teal-700 dark:text-emerald-400">Verifying civic problem relevance and extracting issue details.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {aiRejectionReason && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/15 border-2 border-amber-500/40 flex items-start gap-3 text-xs animate-in fade-in">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-bold text-amber-900 dark:text-amber-200 text-xs">
+                          ⚠️ This image doesn't appear to show a civic issue.
+                        </p>
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                          {aiRejectionReason}
+                        </p>
+                        <p className="text-[10px] text-amber-700/80 dark:text-amber-400 font-medium pt-0.5">
+                          Please upload a photo of a public problem such as a pothole, broken streetlight, water leakage, garbage accumulation, or drainage issue to proceed.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {aiError && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2.5 text-xs animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span className="text-rose-700 dark:text-rose-300 font-medium">
+                        {aiError}
+                      </span>
+                    </div>
+                  )}
+
+                  {aiAnalyzed && !aiRejectionReason && (
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-in fade-in">
                       <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         <span>AI auto-filled title, description, category & department!</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-medium">You can edit below if needed</span>
+                      {aiConfidence !== null && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-bold">
+                          {Math.round(aiConfidence * 100)}% match
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -483,7 +551,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setCurrentStep(2)}
-                      className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs sm:text-sm shadow-glow-teal hover:shadow-lg transition-all flex items-center gap-2"
+                      disabled={isAnalyzingAI || !!aiRejectionReason}
+                      className={`px-6 py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+                        isAnalyzingAI || !!aiRejectionReason
+                          ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                          : 'bg-teal-600 hover:bg-teal-500 shadow-glow-teal hover:shadow-lg'
+                      }`}
                     >
                       <span>Next</span>
                       <ArrowRight className="w-4 h-4" />
@@ -651,6 +724,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <span>Report Anonymously</span>
                     </label>
                   </div>
+
+                  {submitError && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2.5 text-xs animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span className="text-rose-700 dark:text-rose-300 font-medium">
+                        {submitError}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Step 3 Bottom Navigation & Submit */}
                   <div className="flex items-center gap-3 pt-4 border-t border-slate-200 dark:border-[#1E355B]">
