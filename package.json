@@ -8,14 +8,16 @@
     "dev:frontend": "vite",
     "dev:server": "tsx watch server/src/index.ts",
     "server": "tsx server/src/index.ts",
+    "sync:api": "node -e \"const fs=require('fs');const path=require('path');function copy(src,dest){if(!fs.existsSync(path.dirname(dest)))fs.mkdirSync(path.dirname(dest),{recursive:true});const s=fs.statSync(src);if(s.isDirectory()){fs.readdirSync(src).forEach(f=>copy(path.join(src,f),path.join(dest,f)));}else{fs.copyFileSync(src,dest);}}copy('server/src','api/src');console.log('Synced server/src -> api/src');\"",
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "build": "prisma generate && tsc -b && vite build",
+    "build": "npm run sync:api && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
+
   "dependencies": {
     "@google/genai": "^2.24.0",
     "@prisma/client": "^6.4.1",
