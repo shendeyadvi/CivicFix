@@ -83,14 +83,14 @@ If IT IS a relevant civic issue:
   "tags": ["relevant", "keywords"]
 }`;
 
-  // Model fallback chain — tries fast, active models in order if one is experiencing high demand (503)
+  // Model fallback chain — validated working models ordered by speed preference
+  // gemini-3.5-flash, gemini-3.5-flash-lite, gemini-flash-latest are confirmed active
   const MODEL_FALLBACKS = [
+    'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
     'gemini-3.8-flash',
     'gemini-3.7-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash',
   ];
 
   const base64Data = imageBuffer.toString('base64');
