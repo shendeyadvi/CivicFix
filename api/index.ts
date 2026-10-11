@@ -1,6 +1,5 @@
 // Vercel Serverless Function handler — entry point for all /api/* routes
-// This file is compiled by Vercel's TypeScript compiler directly.
-// It MUST NOT use top-level awaits that could crash the module.
+// Server source is co-located in api/src/ to ensure Vercel bundles it correctly.
 
 import type { IncomingMessage, ServerResponse } from 'http';
 
@@ -12,7 +11,8 @@ async function getApp() {
   if (_initError) throw _initError;
 
   try {
-    const mod = await import('../server/src/app');
+    // Import from co-located src/ directory (copied from server/src/ during build)
+    const mod = await import('./src/app');
     _app = mod.default;
     return _app;
   } catch (err: any) {
