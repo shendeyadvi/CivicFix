@@ -645,15 +645,42 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   )}
 
                   {aiAnalyzed && !aiRejectionReason && (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs animate-in fade-in">
-                      <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        <span>AI auto-filled title, description, category & department!</span>
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2 text-xs animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>AI Auto-Filled Details</span>
+                        </div>
+                        {aiConfidence !== null && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-bold">
+                            {Math.round(aiConfidence * 100)}% match
+                          </span>
+                        )}
                       </div>
-                      {aiConfidence !== null && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-bold">
-                          {Math.round(aiConfidence * 100)}% match
-                        </span>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
+                        <div className="p-2 rounded-lg bg-white/70 dark:bg-[#0B192C]/70 border border-emerald-500/20">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Detected Category:</span>
+                          <strong className="text-slate-800 dark:text-slate-200">{category}</strong>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white/70 dark:bg-[#0B192C]/70 border border-emerald-500/20">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Assigned Department:</span>
+                          <strong className="text-teal-700 dark:text-emerald-300">{department}</strong>
+                        </div>
+                      </div>
+
+                      {title && (
+                        <div className="p-2 rounded-lg bg-white/70 dark:bg-[#0B192C]/70 border border-emerald-500/20 text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Generated Title:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{title}</span>
+                        </div>
+                      )}
+
+                      {description && (
+                        <div className="p-2 rounded-lg bg-white/70 dark:bg-[#0B192C]/70 border border-emerald-500/20 text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 block text-[10px]">Generated Description:</span>
+                          <span className="text-slate-700 dark:text-slate-300">{description}</span>
+                        </div>
                       )}
                     </div>
                   )}
