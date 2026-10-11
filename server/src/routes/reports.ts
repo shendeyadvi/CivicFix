@@ -8,14 +8,29 @@ import { checkDuplicateCivicReport } from '../services/duplicateDetection';
 
 const router = Router();
 
-// Configure local disk storage for uploaded complaint photos
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Configure storage for uploaded complaint photos
+import os from 'os';
+
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const uploadDir = isServerless ? path.join(os.tmpdir(), 'uploads') : path.join(process.cwd(), 'uploads');
+
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch {
+  // Ignore in serverless environments where local disk may be restricted
 }
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+    } catch {
+      // Ignore
+    }
     cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {

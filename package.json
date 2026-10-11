@@ -11,7 +11,8 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "build": "tsc -b && vite build",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
