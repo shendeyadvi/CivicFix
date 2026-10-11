@@ -34,9 +34,16 @@ router.post('/analyze-image', upload.single('image'), async (req: Request, res: 
           const arrayBuf = await fetchRes.arrayBuffer();
           imageBuffer = Buffer.from(arrayBuf);
           mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
+        } else {
+          return res.status(400).json({
+            error: `Image link returned HTTP ${fetchRes.status} (Not Found). Please upload your photo directly or choose another sample.`,
+          });
         }
-      } catch (fetchErr) {
+      } catch (fetchErr: any) {
         console.error('Failed to fetch image from imageUrl:', fetchErr);
+        return res.status(400).json({
+          error: `Could not retrieve image from provided URL: ${fetchErr?.message || 'Network error'}`,
+        });
       }
     }
 

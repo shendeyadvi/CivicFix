@@ -40,7 +40,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'CivicFix API' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 CivicFix Backend Server running on http://localhost:${PORT}`);
-  console.log(`📡 API Health Check: http://localhost:${PORT}/api/health`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`🚀 CivicFix Backend Server running on http://127.0.0.1:${PORT} and http://localhost:${PORT}`);
+  console.log(`📡 API Health Check: http://127.0.0.1:${PORT}/api/health`);
 });

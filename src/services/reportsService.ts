@@ -194,11 +194,23 @@ export class ReportsService {
     hint?: string;
   }): Promise<AIAnalysisResponse> {
     if (imagePayload.file) {
-      const formData = new FormData();
-      formData.append('image', imagePayload.file);
-      if (imagePayload.hint) formData.append('hint', imagePayload.hint);
-      const response = await ApiClient.post<{ success: boolean; data: AIAnalysisResponse }>('/api/ai/analyze-image', formData);
-      return response.data;
+      try {
+        const formData = new FormData();
+        formData.append('image', imagePayload.file);
+        if (imagePayload.hint) formData.append('hint', imagePayload.hint);
+        const response = await ApiClient.post<{ success: boolean; data: AIAnalysisResponse }>('/api/ai/analyze-image', formData);
+        return response.data;
+      } catch (err: any) {
+        if (imagePayload.base64) {
+          console.warn('Multipart upload failed, attempting base64 payload fallback:', err?.message);
+          const response = await ApiClient.post<{ success: boolean; data: AIAnalysisResponse }>('/api/ai/analyze-image', {
+            base64: imagePayload.base64,
+            hint: imagePayload.hint,
+          });
+          return response.data;
+        }
+        throw err;
+      }
     } else if (imagePayload.base64) {
       const response = await ApiClient.post<{ success: boolean; data: AIAnalysisResponse }>('/api/ai/analyze-image', {
         base64: imagePayload.base64,
