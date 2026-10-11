@@ -1,41 +1,17 @@
-// Vercel Serverless Function handler — entry point for all /api/* routes
-// Server source is co-located in api/src/ to ensure Vercel bundles it correctly.
-
+// Vercel Serverless Function entrypoint
+// Statically imports app from ./src/app so Vercel's bundler traces and includes all dependencies.
 import type { IncomingMessage, ServerResponse } from 'http';
+import app from './src/app';
 
-let _app: any = null;
-let _initError: Error | null = null;
-
-async function getApp() {
-  if (_app) return _app;
-  if (_initError) throw _initError;
-
+export default function handler(req: IncomingMessage, res: ServerResponse) {
   try {
-    // Import from co-located src/ directory (copied from server/src/ during build)
-    const mod = await import('./src/app');
-    _app = mod.default;
-    return _app;
-  } catch (err: any) {
-    _initError = err;
-    throw err;
-  }
-}
-
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  try {
-    const app = await getApp();
     return app(req, res);
   } catch (err: any) {
-    console.error('[Vercel Handler] Critical startup error:', {
-      message: err?.message,
-      stack: err?.stack,
-      code: err?.code,
-    });
+    console.error('[Vercel Handler] Error:', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      error: 'Server initialization failed',
-      message: err?.message || 'Unknown error during server startup',
-      code: err?.code || 'INIT_ERROR',
+      error: 'Internal Server Error',
+      message: err?.message || 'Server error',
     }));
   }
 }
