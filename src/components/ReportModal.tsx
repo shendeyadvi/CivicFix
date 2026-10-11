@@ -192,7 +192,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         // Not a JSON string
       }
 
-      if (errMsg.includes('404') || errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+      if (errMsg.includes('500') || errMsg.includes('FUNCTION_INVOCATION_FAILED')) {
+        errMsg = 'The AI service encountered an issue (HTTP 500). If testing on the deployed site (Vercel), please ensure backend environment variables (GEMINI_API_KEY, DATABASE_URL) are configured in the Vercel Project Settings, or test locally at http://localhost:5173.';
+      } else if (errMsg.includes('404') || errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
         errMsg = 'CivicFix backend server was not reached (HTTP 404 / Connection error). Please ensure the backend server is running (`npm run dev`).';
       }
 
