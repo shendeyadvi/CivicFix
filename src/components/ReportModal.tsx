@@ -104,7 +104,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [gpsCoords, setGpsCoords] = useState<string>('18.5204° N, 73.8415° E');
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
-  const [generatedTicketId, setGeneratedTicketId] = useState<string>('CF-2026-9104');
+  const [generatedTicketId, setGeneratedTicketId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   if (!isOpen) return null;

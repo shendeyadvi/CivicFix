@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Search, MapPin, Check, ExternalLink, X, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { ReportsService, type CivicReportItem } from '../../services/reportsService';
 
 interface HeaderProps {
   userName?: string;
@@ -15,38 +16,31 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTrack
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(3);
+  const [reports, setReports] = useState<CivicReportItem[]>([]);
   const { theme, toggleTheme } = useTheme();
 
-  const notifications = [
-    {
-      id: 1,
-      title: 'Issue Status Updated',
-      desc: 'Your report "Broken Streetlight" on Viman Nagar Junction is now In Progress by PMC electrical crew.',
-      time: '12m ago',
-      unread: true,
-      type: 'status',
-      trackingId: 'CF-2026-0008'
-    },
-    {
-      id: 2,
-      title: 'Civic Crew Dispatched',
-      desc: 'Sanitation truck dispatched to clear Mandai Market dump site, Pune.',
-      time: '1h ago',
-      unread: true,
-      type: 'dispatch',
-      trackingId: 'CF-2026-0005'
-    },
-    {
-      id: 3,
-      title: 'Community Upvote Milestone',
-      desc: '14 neighbors upvoted the pothole report near Goodluck Cafe square, FC Road.',
-      time: '3h ago',
-      unread: false,
-      type: 'upvote',
-      trackingId: 'CF-2026-0012'
-    },
-  ];
+  useEffect(() => {
+    const load = () => setReports(ReportsService.getReports());
+    load();
+    window.addEventListener('civicfix_reports_updated', load);
+    return () => window.removeEventListener('civicfix_reports_updated', load);
+  }, []);
+
+  const notifications = reports.slice(0, 5).map((r, idx) => ({
+    id: idx + 1,
+    title: r.status === 'Resolved' ? 'Issue Resolved' : r.status === 'In Progress' ? 'Work In Progress' : 'Report Logged',
+    desc: `Your report "${r.title}" (${r.location}) is currently marked as ${r.status}.`,
+    time: r.reportedAgo || r.date,
+    unread: r.status !== 'Resolved',
+    type: 'status',
+    trackingId: r.trackingId
+  }));
+
+  const [unreadCount, setUnreadCount] = useState(notifications.filter((n) => n.unread).length);
+
+  useEffect(() => {
+    setUnreadCount(notifications.filter((n) => n.unread).length);
+  }, [reports]);
 
   return (
     <header className="w-full bg-white/90 dark:bg-[#081220]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-20 transition-colors duration-300">

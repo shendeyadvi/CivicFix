@@ -98,7 +98,7 @@ const MyReportsView: React.FC<ViewProps> = ({ onOpenReport, onOpenTrack }) => (
       onSelectReport={(id) => onOpenTrack(id)}
       onOpenReport={() => onOpenReport()}
     />
-    <ContributionCard totalReported={3} totalResolved={0} />
+    <ContributionCard />
   </div>
 );
 

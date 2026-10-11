@@ -532,8 +532,14 @@ router2.post("/", authenticateToken, upload.single("imageFile"), async (req, res
     } else if (image && typeof image === "string" && image.length > 0) {
       imageUrl = image;
     }
-    const randomNum = Math.floor(1e3 + Math.random() * 9e3);
-    const trackingId = `CF-2026-${randomNum}`;
+    let randomNum = Math.floor(1e3 + Math.random() * 9e3);
+    let trackingId = `CF-2026-${randomNum}`;
+    let existingReport = await prisma.report.findUnique({ where: { trackingId } });
+    while (existingReport) {
+      randomNum = Math.floor(1e3 + Math.random() * 9e3);
+      trackingId = `CF-2026-${randomNum}`;
+      existingReport = await prisma.report.findUnique({ where: { trackingId } });
+    }
     let resolvedDept = department || "Roads & Infrastructure";
     const cat = category || "Roads & Potholes";
     if (!department) {
@@ -571,10 +577,10 @@ router2.post("/", authenticateToken, upload.single("imageFile"), async (req, res
         userId: req.user?.userId || null,
         timeline: {
           create: [
-            { step: "Report Submitted", date: formattedDate, completed: true, order: 1 },
-            { step: "AI Issue Verification", date: "Pending", completed: false, current: true, order: 2 },
-            { step: "Team Assignment", date: "Pending", completed: false, order: 3 },
-            { step: "Issue Resolved", date: "Pending", completed: false, order: 4 }
+            { step: "Report Submitted", date: formattedDate, completed: true, current: false, order: 1 },
+            { step: "AI Issue Verification", date: formattedDate, completed: true, current: false, order: 2 },
+            { step: "Team Assignment", date: "Pending", completed: false, current: true, order: 3 },
+            { step: "Issue Resolved", date: "Pending", completed: false, current: false, order: 4 }
           ]
         }
       },
@@ -632,13 +638,49 @@ router2.patch("/:id/status", authenticateToken, async (req, res) => {
       data: { status },
       include: { timeline: true }
     });
-    if (status === "Resolved" || status === "Closed") {
+    const formattedDate = (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    if (status === "Assigned") {
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id, step: { contains: "Assignment" } },
+        data: { completed: true, current: false, date: formattedDate }
+      });
       await prisma.timelineEvent.updateMany({
         where: { reportId: report.id, step: { contains: "Resolved" } },
-        data: { completed: true, current: false, date: "Today" }
+        data: { completed: false, current: true }
+      });
+    } else if (status === "In Progress") {
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id, step: { contains: "Assignment" } },
+        data: { completed: true, current: false, date: formattedDate }
+      });
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id, step: { contains: "Resolved" } },
+        data: { completed: false, current: true, note: "Work in progress by assigned department" }
+      });
+    } else if (status === "Resolved" || status === "Closed") {
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id, step: { contains: "Assignment" } },
+        data: { completed: true, current: false }
+      });
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id, step: { contains: "Resolved" } },
+        data: { completed: true, current: false, date: formattedDate, note: "Resolved and verified by PMC" }
+      });
+    } else if (status === "Rejected") {
+      await prisma.timelineEvent.updateMany({
+        where: { reportId: report.id },
+        data: { current: false }
       });
     }
-    return res.json({ message: "Status updated successfully", report: updated });
+    const refreshed = await prisma.report.findUnique({
+      where: { id: report.id },
+      include: { timeline: { orderBy: { order: "asc" } } }
+    });
+    return res.json({ message: "Status updated successfully", report: refreshed || updated });
   } catch (error) {
     console.error("Update status error:", error);
     return res.status(500).json({ error: "Failed to update status." });
@@ -654,11 +696,29 @@ router2.patch("/:id/department", authenticateToken, async (req, res) => {
     if (!report) {
       return res.status(404).json({ error: "Report not found." });
     }
+    const formattedDate = (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
     const updated = await prisma.report.update({
       where: { id: report.id },
-      data: { department, status: "Assigned" }
+      data: { department, status: "Assigned" },
+      include: { timeline: true }
     });
-    return res.json({ message: "Department assigned successfully", report: updated });
+    await prisma.timelineEvent.updateMany({
+      where: { reportId: report.id, step: { contains: "Assignment" } },
+      data: { completed: true, current: false, date: formattedDate, note: `Assigned to ${department}` }
+    });
+    await prisma.timelineEvent.updateMany({
+      where: { reportId: report.id, step: { contains: "Resolved" } },
+      data: { current: true }
+    });
+    const refreshed = await prisma.report.findUnique({
+      where: { id: report.id },
+      include: { timeline: { orderBy: { order: "asc" } } }
+    });
+    return res.json({ message: "Department assigned successfully", report: refreshed || updated });
   } catch (error) {
     return res.status(500).json({ error: "Failed to assign department." });
   }

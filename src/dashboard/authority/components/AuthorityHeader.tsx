@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Bell, Sun, Moon, LogOut, Shield, ChevronDown, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
-import { AUTHORITY_NOTIFICATIONS } from '../authorityData';
+import { ReportsService, type CivicReportItem } from '../../../services/reportsService';
 
 interface AuthorityHeaderProps {
   onSearch?: (query: string) => void;
@@ -18,8 +18,28 @@ export const AuthorityHeader: React.FC<AuthorityHeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [reports, setReports] = useState<CivicReportItem[]>([]);
 
-  const unreadCount = AUTHORITY_NOTIFICATIONS.filter((n) => !n.read).length;
+  useEffect(() => {
+    const load = () => setReports(ReportsService.getReports());
+    load();
+    window.addEventListener('civicfix_reports_updated', load);
+    return () => window.removeEventListener('civicfix_reports_updated', load);
+  }, []);
+
+  const notifications = reports
+    .filter((r) => r.status === 'New' || r.priority === 'Critical')
+    .slice(0, 5)
+    .map((r) => ({
+      id: r.id,
+      type: r.priority === 'Critical' ? 'critical' : 'info',
+      title: `${r.priority === 'Critical' ? 'Critical issue' : 'New complaint'} (${r.trackingId})`,
+      desc: `${r.title} — ${r.location}`,
+      time: r.reportedAgo || r.date,
+      read: false,
+    }));
+
+  const unreadCount = notifications.length;
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -93,37 +113,41 @@ export const AuthorityHeader: React.FC<AuthorityHeaderProps> = ({
                 </div>
 
                 <div className="py-2 space-y-2 max-h-80 overflow-y-auto">
-                  {AUTHORITY_NOTIFICATIONS.map((n) => (
-                    <div
-                      key={n.id}
-                      className={`p-3 rounded-xl border transition-colors ${
-                        n.type === 'critical'
-                          ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40'
-                          : n.type === 'overdue'
-                          ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
-                          : 'bg-slate-50 dark:bg-[#0F1E33] border-slate-200 dark:border-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        {n.type === 'critical' ? (
-                          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                            {n.title}
-                          </p>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
-                            {n.desc}
-                          </p>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
-                            {n.time}
-                          </span>
+                  {notifications.length > 0 ? (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`p-3 rounded-xl border transition-colors ${
+                          n.type === 'critical'
+                            ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40'
+                            : 'bg-slate-50 dark:bg-[#0F1E33] border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          {n.type === 'critical' ? (
+                            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {n.title}
+                            </p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                              {n.desc}
+                            </p>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
+                              {n.time}
+                            </span>
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      No new authority alerts. All municipal queues clear.
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <button

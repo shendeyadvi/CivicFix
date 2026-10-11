@@ -1,8 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, CheckCircle2, UserCheck, AlertTriangle, Inbox } from 'lucide-react';
-import { AUTHORITY_ACTIVITY_LOG } from '../authorityData';
+import { ReportsService, type CivicReportItem } from '../../../services/reportsService';
+
+interface ActivityLogItem {
+  id: string;
+  text: string;
+  time: string;
+  type: 'incoming' | 'assignment' | 'resolution' | 'overdue';
+}
 
 export const AuthorityActivityFeed: React.FC = () => {
+  const [reports, setReports] = useState<CivicReportItem[]>([]);
+
+  const loadActivities = () => {
+    setReports(ReportsService.getReports());
+  };
+
+  useEffect(() => {
+    loadActivities();
+    const handleUpdate = () => loadActivities();
+    window.addEventListener('civicfix_reports_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('civicfix_reports_updated', handleUpdate);
+    };
+  }, []);
+
+  const activities: ActivityLogItem[] = reports.slice(0, 6).map((r) => {
+    let text = `Complaint ${r.trackingId} logged: ${r.title}`;
+    let type: ActivityLogItem['type'] = 'incoming';
+
+    if (r.status === 'Resolved' || r.status === 'Closed') {
+      text = `Complaint ${r.trackingId} marked Resolved (${r.department})`;
+      type = 'resolution';
+    } else if (r.status === 'In Progress') {
+      text = `Complaint ${r.trackingId} moved to In Progress by ${r.department}`;
+      type = 'assignment';
+    } else if (r.status === 'Assigned') {
+      text = `Complaint ${r.trackingId} assigned to ${r.department}`;
+      type = 'assignment';
+    } else if (r.priority === 'Critical') {
+      type = 'overdue';
+    }
+
+    return {
+      id: r.id,
+      text,
+      time: r.reportedAgo || r.date,
+      type,
+    };
+  });
+
   return (
     <div className="bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-[#1E355B] rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -16,42 +63,48 @@ export const AuthorityActivityFeed: React.FC = () => {
       </div>
 
       <div className="space-y-3">
-        {AUTHORITY_ACTIVITY_LOG.map((act) => {
-          let Icon = Activity;
-          let color = 'text-teal-500 bg-teal-500/10';
-          if (act.type === 'assignment') {
-            Icon = UserCheck;
-            color = 'text-blue-500 bg-blue-500/10';
-          } else if (act.type === 'resolution') {
-            Icon = CheckCircle2;
-            color = 'text-emerald-500 bg-emerald-500/10';
-          } else if (act.type === 'incoming') {
-            Icon = Inbox;
-            color = 'text-sky-500 bg-sky-500/10';
-          } else if (act.type === 'overdue') {
-            Icon = AlertTriangle;
-            color = 'text-red-500 bg-red-500/10';
-          }
+        {activities.length > 0 ? (
+          activities.map((act) => {
+            let Icon = Activity;
+            let color = 'text-teal-500 bg-teal-500/10';
+            if (act.type === 'assignment') {
+              Icon = UserCheck;
+              color = 'text-blue-500 bg-blue-500/10';
+            } else if (act.type === 'resolution') {
+              Icon = CheckCircle2;
+              color = 'text-emerald-500 bg-emerald-500/10';
+            } else if (act.type === 'incoming') {
+              Icon = Inbox;
+              color = 'text-sky-500 bg-sky-500/10';
+            } else if (act.type === 'overdue') {
+              Icon = AlertTriangle;
+              color = 'text-red-500 bg-red-500/10';
+            }
 
-          return (
-            <div
-              key={act.id}
-              className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-slate-800/80 transition-colors"
-            >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-                <Icon className="w-3.5 h-3.5" />
+            return (
+              <div
+                key={act.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-slate-800/80 transition-colors"
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                    {act.text}
+                  </p>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5 font-medium">
+                    {act.time}
+                  </span>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 leading-snug">
-                  {act.text}
-                </p>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5 font-medium">
-                  {act.time}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="py-6 text-center text-xs text-slate-400">
+            No authority activity logged yet. All municipal complaint queues are clear.
+          </div>
+        )}
       </div>
     </div>
   );

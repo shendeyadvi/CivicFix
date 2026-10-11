@@ -43,38 +43,19 @@ export interface AIAnalysisResponse {
   tags?: string[];
 }
 
-const STORAGE_KEY = 'civicfix_reports_data';
-
 // In-memory cache for ultra-responsive UI renders
 let memoryCache: CivicReportItem[] = [];
 let isInitialized = false;
 
 export class ReportsService {
-  // Synchronous getter from cache / storage (safe for immediate component render)
+  // Synchronous getter from in-memory cache (safe for immediate component render)
   public static getReports(): CivicReportItem[] {
-    if (memoryCache.length > 0) {
-      return memoryCache;
-    }
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        memoryCache = JSON.parse(data);
-        return memoryCache;
-      }
-    } catch {
-      // ignore
-    }
-    return [];
+    return memoryCache;
   }
 
   private static notifyChange(reports: CivicReportItem[]) {
     memoryCache = reports;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-      window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: reports }));
-    } catch {
-      // ignore
-    }
+    window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: reports }));
   }
 
   // Fetch all reports from the real backend API
@@ -86,63 +67,19 @@ export class ReportsService {
         return reports;
       }
     } catch (err) {
-      console.warn('Backend /api/reports unavailable, using local cache:', err);
+      console.warn('Backend /api/reports unavailable:', err);
     }
-    return this.getReports();
+    return memoryCache;
   }
 
-  // Submit a new civic report to the backend database (with resilient offline fallback)
+  // Submit a new civic report to the backend database
   public static async addReport(report: Partial<CivicReportItem>): Promise<CivicReportItem> {
-    try {
-      const response = await ApiClient.post<{ message: string; report: CivicReportItem }>('/api/reports', report);
-      if (response && response.report) {
-        await this.fetchReports(); // Refresh global list from database
-        return response.report;
-      }
-    } catch (err: any) {
-      console.warn('Backend report submission API returned error, saving locally:', err?.message || err);
+    const response = await ApiClient.post<{ message: string; report: CivicReportItem }>('/api/reports', report);
+    if (!response || !response.report) {
+      throw new Error('Backend failed to create report record in database.');
     }
-
-    // Graceful offline fallback: Create the report and save to persistent storage so user request never fails
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const trackingId = `CF-2026-${randomNum}`;
-    const formattedDate = new Date().toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-
-    const newReport: CivicReportItem = {
-      id: `local-${Date.now()}`,
-      trackingId,
-      title: report.title || 'Civic Infrastructure Defect',
-      category: report.category || 'Roads & Potholes',
-      location: report.location || 'Pune Municipal Corporation Area',
-      ward: report.ward || 'Ward 12 - Shivajinagar',
-      priority: report.priority || 'High',
-      department: report.department || 'Roads & Infrastructure',
-      assignedTo: 'PMC Nodal Officer',
-      status: 'New',
-      date: formattedDate,
-      reportedAgo: 'Just now',
-      citizenName: report.citizenName || 'Aarav Deshmukh',
-      citizenPhone: report.citizenPhone || '+91 98765 43210',
-      description: report.description || 'Public infrastructure grievance reported via CivicFix portal.',
-      lat: report.lat || 18.5204,
-      lng: report.lng || 73.8567,
-      upvotes: 0,
-      image: report.image,
-      timeline: [
-        { step: 'Report Submitted', date: formattedDate, completed: true },
-        { step: 'AI Issue Verification', date: 'Pending', completed: false, current: true },
-        { step: 'Team Assignment', date: 'Pending', completed: false },
-        { step: 'Issue Resolved', date: 'Pending', completed: false },
-      ],
-    };
-
-    const currentReports = this.getReports();
-    this.notifyChange([newReport, ...currentReports]);
-    return newReport;
+    await this.fetchReports(); // Refresh global list from PostgreSQL database
+    return response.report;
   }
 
   // Track report by ticket tracking ID from backend database
@@ -273,11 +210,7 @@ if (typeof window !== 'undefined' && !isInitialized) {
 
   // Clear legacy mock reports if lingering in browser cache
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw && (raw.includes('rep-101') || raw.includes('rep-102') || raw.includes('rep-103'))) {
-      localStorage.removeItem(STORAGE_KEY);
-      memoryCache = [];
-    }
+    localStorage.removeItem('civicfix_reports_data');
   } catch {
     // ignore
   }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, ImageIcon } from 'lucide-react';
-import { HERO_MAP_ISSUES, type CivicIssue } from '../data/mockData';
+import type { CivicIssue } from '../data/mockData';
 import { ReportsService } from '../services/reportsService';
 
 interface TrackModalProps {
@@ -10,52 +10,70 @@ interface TrackModalProps {
 }
 
 export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initialTrackingId }) => {
-  const [searchId, setSearchId] = useState<string>('CF-2026-8942');
-  const [matchedIssue, setMatchedIssue] = useState<CivicIssue>(HERO_MAP_ISSUES[0]);
+  const [searchId, setSearchId] = useState<string>(initialTrackingId || '');
+  const [matchedIssue, setMatchedIssue] = useState<CivicIssue | null>(null);
   const [reportImage, setReportImage] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const autoSearchDone = useRef<string | undefined>(undefined);
+
+  const fetchAndSetReport = async (trackingId: string) => {
+    if (!trackingId.trim()) return;
+    setIsLoading(true);
+    setNotFound(false);
+    try {
+      const userReport = await ReportsService.trackReport(trackingId.trim());
+      if (userReport) {
+        setMatchedIssue({
+          id: userReport.id,
+          trackingId: userReport.trackingId,
+          title: userReport.title,
+          category: userReport.category as CivicIssue['category'],
+          location: userReport.location,
+          mapQuery: '',
+          coordinates: { x: 50, y: 50 },
+          reportedDate: userReport.date,
+          status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : userReport.status,
+          statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
+          priority: userReport.priority,
+          department: userReport.department,
+          assignedOfficer: userReport.assignedTo,
+          estimatedFixTime: '48 Hours',
+          description: userReport.description,
+          upvotes: userReport.upvotes,
+          timeline: userReport.timeline && userReport.timeline.length > 0 ? userReport.timeline : [
+            { step: 'Report Submitted', date: userReport.date, completed: true },
+            { step: 'AI Issue Verification', date: userReport.date, completed: true },
+            { step: 'Team Assignment', date: 'Pending', completed: false },
+            { step: 'Issue Resolved', date: 'Pending', completed: false },
+          ],
+        });
+        setReportImage(userReport.image || null);
+        setNotFound(false);
+      } else {
+        setMatchedIssue(null);
+        setReportImage(null);
+        setNotFound(true);
+      }
+    } catch {
+      setMatchedIssue(null);
+      setReportImage(null);
+      setNotFound(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Auto-search when opened with an initialTrackingId
   useEffect(() => {
     if (isOpen && initialTrackingId && autoSearchDone.current !== initialTrackingId) {
       autoSearchDone.current = initialTrackingId;
       setSearchId(initialTrackingId);
-      
-      const doSearch = async () => {
-        const userReport = await ReportsService.trackReport(initialTrackingId);
-        if (userReport) {
-          setMatchedIssue({
-            id: userReport.id,
-            trackingId: userReport.trackingId,
-            title: userReport.title,
-            category: userReport.category as CivicIssue['category'],
-            location: userReport.location,
-            mapQuery: '',
-            coordinates: { x: 50, y: 50 },
-            reportedDate: userReport.date,
-            status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
-            statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
-            priority: userReport.priority,
-            department: userReport.department,
-            assignedOfficer: userReport.assignedTo,
-            estimatedFixTime: '48 Hours',
-            description: userReport.description,
-            upvotes: userReport.upvotes,
-            timeline: userReport.timeline && userReport.timeline.length > 0 ? userReport.timeline : [
-              { step: 'Report Submitted', date: userReport.date, completed: true },
-              { step: 'Issue Verification', date: 'Pending', completed: false },
-              { step: 'Team Assignment', date: 'Pending', completed: false },
-              { step: 'Issue Resolved', date: 'Pending', completed: false },
-            ],
-          });
-          setReportImage(userReport.image || null);
-        }
-      };
-
-      doSearch();
+      fetchAndSetReport(initialTrackingId);
     }
     if (!isOpen) {
       autoSearchDone.current = undefined;
+      setNotFound(false);
     }
   }, [isOpen, initialTrackingId]);
 
@@ -63,51 +81,10 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchId.trim().toUpperCase();
-    const userReport = await ReportsService.trackReport(query);
-
-    if (userReport) {
-      setMatchedIssue({
-        id: userReport.id,
-        trackingId: userReport.trackingId,
-        title: userReport.title,
-        category: userReport.category as CivicIssue['category'],
-        location: userReport.location,
-        mapQuery: '',
-        coordinates: { x: 50, y: 50 },
-        reportedDate: userReport.date,
-        status: userReport.status === 'New' ? 'Reported' : userReport.status === 'In Progress' ? 'In Progress' : userReport.status === 'Resolved' ? 'Resolved' : 'Under Review',
-        statusColor: userReport.status === 'New' ? '#3B82F6' : userReport.status === 'Resolved' ? '#22C55E' : userReport.status === 'In Progress' ? '#F59E0B' : '#3B82F6',
-        priority: userReport.priority,
-        department: userReport.department,
-        assignedOfficer: userReport.assignedTo,
-        estimatedFixTime: '48 Hours',
-        description: userReport.description,
-        upvotes: userReport.upvotes,
-        timeline: userReport.timeline && userReport.timeline.length > 0 ? userReport.timeline : [
-          { step: 'Report Submitted', date: userReport.date, completed: true },
-          { step: 'Issue Verification', date: 'Pending', completed: false },
-          { step: 'Team Assignment', date: 'Pending', completed: false },
-          { step: 'Issue Resolved', date: 'Pending', completed: false },
-        ],
-      });
-      setReportImage(userReport.image || null);
-    } else {
-      const found = HERO_MAP_ISSUES.find(
-        (i) => i.trackingId.toUpperCase() === query || i.id.toLowerCase() === query.toLowerCase()
-      );
-      if (found) {
-        setMatchedIssue(found);
-        setReportImage(null);
-      } else {
-        setMatchedIssue({
-          ...HERO_MAP_ISSUES[0],
-          trackingId: query.startsWith('CF-') ? query : `CF-${query}`,
-        });
-        setReportImage(null);
-      }
-    }
+    fetchAndSetReport(searchId);
   };
+
+  const existingReports = ReportsService.getReports().slice(0, 3);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
@@ -161,24 +138,39 @@ export const TrackModal: React.FC<TrackModalProps> = ({ isOpen, onClose, initial
             </button>
           </form>
 
-          {/* Quick Ticket Pill Suggestion */}
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="text-slate-500 dark:text-slate-400">Quick Try:</span>
-            {HERO_MAP_ISSUES.map((issue) => (
-              <button
-                key={issue.trackingId}
-                type="button"
-                onClick={() => {
-                  setSearchId(issue.trackingId);
-                  setMatchedIssue(issue);
-                  setReportImage(null);
-                }}
-                className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-deepTeal-700 dark:text-softMint-300 hover:text-deepTeal-900 dark:hover:text-white"
-              >
-                {issue.trackingId}
-              </button>
-            ))}
-          </div>
+          {/* Quick Ticket Pill Suggestion if real reports exist */}
+          {existingReports.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-slate-500 dark:text-slate-400">Recent Reports:</span>
+              {existingReports.map((report) => (
+                <button
+                  key={report.trackingId}
+                  type="button"
+                  onClick={() => {
+                    setSearchId(report.trackingId);
+                    fetchAndSetReport(report.trackingId);
+                  }}
+                  className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-deepTeal-700 dark:text-softMint-300 hover:text-deepTeal-900 dark:hover:text-white cursor-pointer"
+                >
+                  {report.trackingId}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Not Found State */}
+          {notFound && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-medium text-center">
+              No complaint record found matching Ticket ID "{searchId}". Please verify the ticket ID.
+            </div>
+          )}
+
+          {/* Prompt State when nothing searched yet */}
+          {!matchedIssue && !notFound && (
+            <div className="p-8 rounded-2xl bg-slate-50 dark:bg-[#081220] border border-slate-200 dark:border-[#1E355B] text-slate-500 dark:text-slate-400 text-xs text-center">
+              Enter your Complaint Ticket ID above to track live municipal audit and resolution progress.
+            </div>
+          )}
 
           {/* Ticket Result Details */}
           {matchedIssue && (
