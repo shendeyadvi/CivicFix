@@ -1,61 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Layers, Compass } from 'lucide-react';
+import { MapPin, Compass, ExternalLink, Filter, Building2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
-import { ReportsService } from '../../../services/reportsService';
+import { ReportsService, type CivicReportItem } from '../../../services/reportsService';
 
-interface MapMarker {
-  id: string;
-  title: string;
-  category: string;
-  color: string;
-  top: string;
-  left: string;
-}
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'Critical':
+      return { text: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)' };
+    case 'High':
+      return { text: '#F97316', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)' };
+    case 'Medium':
+      return { text: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' };
+    default:
+      return { text: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)' };
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'Resolved':
+    case 'Closed':
+      return { text: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle2 };
+    case 'In Progress':
+    case 'Assigned':
+      return { text: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/30', icon: Clock };
+    case 'Rejected':
+      return { text: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/30', icon: AlertTriangle };
+    default:
+      return { text: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/30', icon: AlertTriangle };
+  }
+};
 
 export const JurisdictionMap: React.FC = () => {
   const { theme } = useTheme();
-  const [timeFilter, setTimeFilter] = useState<'Today' | '7 Days' | '30 Days'>('7 Days');
+  const [reports, setReports] = useState<CivicReportItem[]>([]);
+  const [selectedReport, setSelectedReport] = useState<CivicReportItem | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
-  const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  const loadMarkers = () => {
-    const reports = ReportsService.getReports();
-    const mapped: MapMarker[] = reports.map((r, idx) => {
-      let color = '#3B82F6';
-      if (r.priority === 'Critical') color = '#EF4444';
-      else if (r.category.includes('Road')) color = '#F59E0B';
-      else if (r.category.includes('Light')) color = '#A855F7';
-      else if (r.category.includes('Waste') || r.category.includes('Sanitation')) color = '#22C55E';
-      else if (r.category.includes('Water') || r.category.includes('Drain')) color = '#0EA5E9';
-
-      // Positional offsets on mock map overlay
-      const topPct = 25 + ((idx * 13) % 55);
-      const leftPct = 20 + ((idx * 17) % 65);
-
-      return {
-        id: r.id,
-        title: `${r.title} (${r.location.split(',')[0]})`,
-        category: r.category,
-        color,
-        top: `${topPct}%`,
-        left: `${leftPct}%`,
-      };
-    });
-    setMarkers(mapped);
+  const updateReports = () => {
+    const list = ReportsService.getReports();
+    setReports(list);
+    if (list.length > 0) {
+      setSelectedReport((prev) => (prev && list.some((r) => r.id === prev.id) ? prev : list[0]));
+    }
   };
 
   useEffect(() => {
-    loadMarkers();
-    const handleUpdate = () => loadMarkers();
+    // Initial fetch from live API & cache
+    ReportsService.loadReports().then((list) => {
+      setReports(list);
+      if (list.length > 0) setSelectedReport(list[0]);
+    });
+
+    const handleUpdate = () => updateReports();
     window.addEventListener('civicfix_reports_updated', handleUpdate);
     return () => {
       window.removeEventListener('civicfix_reports_updated', handleUpdate);
     };
   }, []);
 
-  const filteredMarkers = categoryFilter === 'All'
-    ? markers
-    : markers.filter((m) => m.category.toLowerCase().includes(categoryFilter.toLowerCase()));
+  const filteredReports = reports.filter((r) => {
+    const matchCategory =
+      categoryFilter === 'All' || r.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    const matchStatus = statusFilter === 'All' || r.status === statusFilter;
+    return matchCategory && matchStatus;
+  });
+
+  const activeReport = selectedReport || (filteredReports.length > 0 ? filteredReports[0] : null);
+
+  // Dynamic Google Map centered on selected Pune location
+  const mapQuery = activeReport
+    ? `${activeReport.location}, Pune, Maharashtra`
+    : 'Pune Municipal Corporation, Maharashtra';
+
+  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
   return (
     <div className="bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-[#1E355B] rounded-2xl p-5 shadow-sm space-y-4">
@@ -64,30 +83,31 @@ export const JurisdictionMap: React.FC = () => {
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Compass className="w-4 h-4 text-teal-600 dark:text-emerald-400" />
-            Complaints Across Your Jurisdiction ({markers.length})
+            Complaints Across Your Jurisdiction ({filteredReports.length})
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Geographic complaint distribution across Pune Municipal Corporation (PMC) wards
           </p>
         </div>
 
-        {/* Filter buttons */}
+        {/* Filter controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg bg-slate-100 dark:bg-[#0F1E33] p-1 border border-slate-200 dark:border-[#1E355B]">
-            {(['Today', '7 Days', '30 Days'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTimeFilter(t)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                  timeFilter === t
-                    ? 'bg-teal-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Filter className="w-3.5 h-3.5 text-teal-500" />
+            <span className="font-semibold text-[11px] uppercase tracking-wider">Filters:</span>
           </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-slate-800 dark:text-slate-200 focus:outline-none"
+          >
+            <option value="All">All Statuses</option>
+            <option value="New">New</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
 
           <select
             value={categoryFilter}
@@ -95,70 +115,145 @@ export const JurisdictionMap: React.FC = () => {
             className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-slate-800 dark:text-slate-200 focus:outline-none"
           >
             <option value="All">All Categories</option>
-            <option value="Water">Water Supply</option>
-            <option value="Waste">Waste Management</option>
             <option value="Road">Roads & Infra</option>
             <option value="Light">Streetlights</option>
+            <option value="Waste">Waste & Sanitation</option>
+            <option value="Water">Water Supply</option>
+            <option value="Drain">Drainage</option>
           </select>
         </div>
       </div>
 
-      {/* Map Graphic Surface */}
-      <div className="relative w-full h-[360px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-[#EBF3F0] dark:bg-[#071322]">
-        {/* Real Interactive Map Iframe centered on Pune */}
+      {/* Map Surface */}
+      <div className="relative w-full h-[380px] rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-[#EBF3F0] dark:bg-[#071322]">
         <iframe
-          title="PMC Pune Jurisdiction Map"
+          title="PMC Pune Jurisdiction Live Map"
           width="100%"
           height="100%"
           frameBorder="0"
           scrolling="no"
-          src={`https://maps.google.com/maps?q=Pune%20Maharashtra&t=&z=13&ie=UTF8&iwloc=&output=embed`}
-          className={`w-full h-full transition-opacity duration-300 ${
-            theme === 'dark' ? 'invert opacity-70 contrast-125' : 'opacity-90'
-          }`}
+          src={mapEmbedUrl}
+          className="w-full h-full border-0 transition-opacity duration-300"
+          style={theme === 'dark' ? { filter: 'invert(90%) hue-rotate(180deg)' } : {}}
+          loading="lazy"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
         />
 
-        {/* Overlay Pins & Legend */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Overlay Grid lines for Operations room feel */}
-          <div className="w-full h-full bg-[linear-gradient(to_right,#0f766e0a_1px,transparent_1px),linear-gradient(to_bottom,#0f766e0a_1px,transparent_1px)] bg-[size:32px_32px]" />
-
-          {/* Interactive Marker Pins */}
-          {filteredMarkers.map((m) => (
-            <div
-              key={m.id}
-              style={{ top: m.top, left: m.left }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group"
-            >
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-125 animate-bounce"
-                style={{ backgroundColor: m.color }}
-              >
-                <MapPin className="w-4 h-4 fill-white" />
-              </div>
-
-              {/* Marker Tooltip */}
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-8 hidden group-hover:block bg-slate-900 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-xl whitespace-nowrap z-30">
-                {m.title}
+        {/* Selected Complaint Floating Card Overlay */}
+        {activeReport && (
+          <div className="absolute top-3 left-3 max-w-[300px] sm:max-w-sm bg-white/95 dark:bg-[#0B192C]/95 backdrop-blur-md border border-slate-200 dark:border-[#1E355B] rounded-2xl p-3.5 shadow-xl z-20 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-mono font-bold text-teal-600 dark:text-emerald-400">
+                {activeReport.trackingId}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {(() => {
+                  const pColor = getPriorityColor(activeReport.priority);
+                  return (
+                    <span
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
+                      style={{
+                        color: pColor.text,
+                        backgroundColor: pColor.bg,
+                        borderColor: pColor.border,
+                      }}
+                    >
+                      {activeReport.priority}
+                    </span>
+                  );
+                })()}
+                {(() => {
+                  const sBadge = getStatusBadge(activeReport.status);
+                  const SIcon = sBadge.icon;
+                  return (
+                    <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${sBadge.bg} ${sBadge.text}`}>
+                      <SIcon className="w-2.5 h-2.5" />
+                      {activeReport.status}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Floating Controls Overlay */}
-        <div className="absolute bottom-3 left-3 bg-white/90 dark:bg-[#0B192C]/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-200 dark:border-[#1E355B] shadow-lg flex items-center gap-3 text-[11px] font-bold text-slate-700 dark:text-slate-300">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sky-500" /> Water</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Waste</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> Roads</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Lighting</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Critical</span>
-        </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">
+                {activeReport.title}
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                <MapPin className="w-3 h-3 text-teal-500 shrink-0" />
+                <span className="truncate">{activeReport.location}</span>
+              </p>
+            </div>
 
-        <div className="absolute top-3 right-3 bg-white/90 dark:bg-[#0B192C]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1E355B] shadow-md text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5 text-teal-600 dark:text-emerald-400" />
-          <span>PMC Jurisdiction</span>
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[10px]">
+              <span className="text-slate-500 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-slate-400" />
+                {activeReport.department}
+              </span>
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-teal-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+              >
+                <span>Navigate</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Jurisdiction Badge */}
+        <div className="absolute bottom-3 right-3 bg-white/90 dark:bg-[#0B192C]/90 backdrop-blur-md border border-slate-200 dark:border-[#1E355B] rounded-xl px-2.5 py-1.5 flex items-center gap-2 text-[11px] font-medium z-20 shadow-md">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-slate-900 dark:text-white font-bold">Pune Central Ward</span>
+          <span className="text-slate-400 font-mono text-[10px]">PMC</span>
         </div>
       </div>
+
+      {/* Interactive Location Switcher Strip */}
+      {filteredReports.length > 0 && (
+        <div className="pt-1">
+          <div className="flex items-center justify-between pb-2">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+              Focus Location on Map:
+            </span>
+            <span className="text-[10px] text-slate-500">
+              Click any complaint to re-center
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+            {filteredReports.map((r) => {
+              const isSelected = activeReport?.id === r.id;
+              const pColor = getPriorityColor(r.priority);
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedReport(r)}
+                  className={`shrink-0 px-3 py-1.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-teal-600 text-white border-teal-500 shadow-sm'
+                      : 'bg-slate-50 dark:bg-[#081220] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-teal-500/50 hover:bg-slate-100 dark:hover:bg-[#0F1E33]'
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: isSelected ? '#FFFFFF' : pColor.text }}
+                  />
+                  <div className="max-w-[160px]">
+                    <p className="text-[11px] font-bold truncate leading-tight">{r.title}</p>
+                    <p className={`text-[9px] truncate ${isSelected ? 'text-teal-100' : 'text-slate-400'}`}>
+                      {r.location.split(',')[0]}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
