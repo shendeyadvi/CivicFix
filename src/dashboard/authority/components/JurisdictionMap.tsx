@@ -40,18 +40,25 @@ export const JurisdictionMap: React.FC = () => {
 
   const updateReports = () => {
     const list = ReportsService.getReports();
-    setReports(list);
-    if (list.length > 0) {
+    if (Array.isArray(list) && list.length > 0) {
+      setReports(list);
       setSelectedReport((prev) => (prev && list.some((r) => r.id === prev.id) ? prev : list[0]));
     }
   };
 
   useEffect(() => {
-    // Initial fetch from live API & cache
-    ReportsService.loadReports().then((list) => {
-      setReports(list);
-      if (list.length > 0) setSelectedReport(list[0]);
-    });
+    // 1. Immediately render cached reports if available
+    updateReports();
+
+    // 2. Fetch fresh live reports from PostgreSQL API
+    ReportsService.fetchReports()
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          setReports(list);
+          setSelectedReport((prev) => (prev && list.some((r) => r.id === prev.id) ? prev : list[0]));
+        }
+      })
+      .catch((err) => console.warn('Could not fetch reports for JurisdictionMap:', err));
 
     const handleUpdate = () => updateReports();
     window.addEventListener('civicfix_reports_updated', handleUpdate);

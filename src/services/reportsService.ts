@@ -59,6 +59,10 @@ export class ReportsService {
   }
 
   // Fetch all reports from the real backend API
+  public static async loadReports(): Promise<CivicReportItem[]> {
+    return this.fetchReports();
+  }
+
   public static async fetchReports(): Promise<CivicReportItem[]> {
     try {
       const reports = await ApiClient.get<CivicReportItem[]>('/api/reports');
