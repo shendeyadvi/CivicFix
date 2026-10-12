@@ -314,7 +314,7 @@ export const ComplaintQueue: React.FC<ComplaintQueueProps> = ({
       {selectedComplaint && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-lg bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-[#1E355B] rounded-3xl shadow-2xl p-6 space-y-4 overflow-hidden"
+            className="relative w-full max-w-lg max-h-[90vh] bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-[#1E355B] rounded-3xl shadow-2xl p-6 space-y-4 overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
