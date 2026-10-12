@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Bell, Sun, Moon, LogOut, Shield, ChevronDown, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import { ReportsService, type CivicReportItem } from '../../../services/reportsService';
