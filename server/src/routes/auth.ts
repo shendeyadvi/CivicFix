@@ -226,4 +226,70 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+// Google Sign In / Registration endpoint
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    const { email, name, role } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Google email is required.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const userRole = role === 'official' ? 'official' : 'citizen';
+
+    let user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      const passwordHash = await bcrypt.hash(`google-auth-${Date.now()}`, 10);
+      let derivedName = (name && name.trim()) || '';
+      if (!derivedName && normalizedEmail.includes('@')) {
+        const raw = normalizedEmail.split('@')[0];
+        derivedName = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/[^a-zA-Z]/g, ' ');
+      }
+
+      user = await prisma.user.create({
+        data: {
+          name: derivedName || 'Google User',
+          email: normalizedEmail,
+          passwordHash,
+          role: userRole,
+          ward: userRole === 'citizen' ? 'Ward 12 - Shivajinagar' : null,
+          department: userRole === 'official' ? 'Roads & Infrastructure' : null,
+          employeeId: userRole === 'official' ? `PMC-OFF-${Math.floor(1000 + Math.random() * 9000)}` : null,
+          isDemo: false,
+        },
+      });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role as 'citizen' | 'official',
+      name: user.name,
+    });
+
+    return res.json({
+      message: 'Google login successful',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        ward: user.ward,
+        department: user.department,
+        employeeId: user.employeeId,
+        isDemo: user.isDemo,
+      },
+    });
+  } catch (error) {
+    console.error('Google login error:', error);
+    return res.status(500).json({ error: 'Failed to process Google sign in.' });
+  }
+});
+
 export default router;

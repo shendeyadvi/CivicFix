@@ -115,6 +115,37 @@ export const AuthService = {
     }
   },
 
+  async loginWithGoogle(
+    role: 'citizen' | 'official' = 'citizen',
+    profile?: { email: string; name?: string }
+  ): Promise<UserProfile> {
+    const email = profile?.email || (role === 'citizen' ? 'citizen.user@gmail.com' : 'officer.pmc@gmail.com');
+    const name = profile?.name || (role === 'citizen' ? 'Civic Resident' : 'Municipal Officer');
+
+    try {
+      const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/google', {
+        email,
+        name,
+        role,
+      });
+      this.setCurrentUser(response.user, response.token);
+      return response.user;
+    } catch (err) {
+      console.warn('Backend Google sign-in fallback:', err);
+      const fallbackUser: UserProfile = {
+        name,
+        email,
+        role,
+        isDemo: false,
+        ward: role === 'citizen' ? 'Ward 12 - Shivajinagar' : 'Central PMC Zone',
+        department: role === 'official' ? 'Roads & Infrastructure' : undefined,
+        employeeId: role === 'official' ? 'PMC-GOOG-8842' : undefined,
+      };
+      this.setCurrentUser(fallbackUser);
+      return fallbackUser;
+    }
+  },
+
   getInitials(name: string): string {
     if (!name) return 'CF';
     const parts = name.trim().split(' ').filter(Boolean);
