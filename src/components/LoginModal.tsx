@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
@@ -15,11 +15,16 @@ import {
   LogIn,
   MapPin,
   Briefcase,
-  AlertCircle,
-  ChevronRight
+  AlertCircle
 } from 'lucide-react';
 
 import { AuthService, type UserProfile } from '../services/authService';
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -75,38 +80,114 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Google Sign In state
-  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
-
-  if (!isOpen) return null;
+  // Hidden Google Identity Services container
+  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
 
   const resetErrors = () => {
     setErrorMsg('');
     setSuccessMsg('');
   };
 
-  const handleGoogleSignIn = async (profile?: { email: string; name?: string }) => {
+  // Process verified ID token returned by Google Identity Services
+  const handleGoogleCredentialResponse = async (response: any) => {
+    if (!response || !response.credential) {
+      setErrorMsg('Google Sign-In was cancelled or did not return a credential.');
+      setIsLoading(false);
+      return;
+    }
+
     resetErrors();
     setIsLoading(true);
 
     try {
-      const email = profile?.email || (role === 'citizen' ? 'citizen.user@gmail.com' : 'officer.pmc@gmail.com');
-      const name = profile?.name || (role === 'citizen' ? 'Civic Resident' : 'Municipal Officer');
-
-      const userProfile = await AuthService.loginWithGoogle(role, { email, name });
+      const userProfile = await AuthService.loginWithGoogleIdToken(response.credential);
       setIsLoading(false);
       setSuccessMsg(`Welcome, ${userProfile.name}! Signed in with Google.`);
       setTimeout(() => {
         onClose();
         if (onLoginSuccess) {
-          onLoginSuccess(role, userProfile);
+          onLoginSuccess(userProfile.role as 'citizen' | 'official' || 'citizen', userProfile);
         }
       }, 500);
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMsg(err.message || 'Failed to sign in with Google.');
+      setErrorMsg(err.message || 'Failed to authenticate with Google. Please try again.');
+    }
+  };
+
+  // Initialize Google Identity Services
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const initGsi = () => {
+      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          if (googleBtnContainerRef.current) {
+            googleBtnContainerRef.current.innerHTML = '';
+            window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+              type: 'standard',
+              theme: 'outline',
+              size: 'large',
+              text: 'continue_with',
+              shape: 'rectangular',
+              width: 320,
+            });
+          }
+        } catch (e) {
+          console.warn('GIS initialize error:', e);
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGsi();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(interval);
+          initGsi();
+        }
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen]);
+
+  const handleGoogleClick = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setErrorMsg('Google Sign-In is not configured. Please add VITE_GOOGLE_CLIENT_ID to your environment.');
+      return;
+    }
+
+    resetErrors();
+
+    if (window.google?.accounts?.id) {
+      // Prompt One-tap / account chooser or trigger rendered button
+      try {
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed()) {
+            // If prompt is suppressed (e.g. third-party cookies or browser policy), click the rendered iframe button
+            const iframe = googleBtnContainerRef.current?.querySelector('div[role=button]') as HTMLElement;
+            if (iframe) {
+              iframe.click();
+            }
+          }
+        });
+      } catch (err: any) {
+        setErrorMsg('Could not open Google sign in. Please verify popup permissions.');
+      }
+    } else {
+      setErrorMsg('Google Identity Services is loading. Please try again in a moment.');
     }
   };
 

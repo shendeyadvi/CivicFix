@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../db';
 import { generateToken, AuthenticatedRequest, authenticateToken } from '../middleware/auth';
 
@@ -226,44 +228,101 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
-// Google Sign In / Registration endpoint
+// Google Sign In / Registration endpoint with secure ID token verification
 router.post('/google', async (req: Request, res: Response) => {
   try {
-    const { email, name, role } = req.body;
+    const { idToken, credential } = req.body;
+    const tokenToVerify = idToken || credential;
 
-    if (!email) {
-      return res.status(400).json({ error: 'Google email is required.' });
+    if (!tokenToVerify) {
+      return res.status(400).json({ error: 'Google ID token is required for authentication.' });
+    }
+
+    const currentGoogleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+    if (!currentGoogleClientId) {
+      return res.status(503).json({
+        error: 'Google Sign-In is not configured on the server. Please set GOOGLE_CLIENT_ID in server environment.',
+      });
+    }
+
+    // Verify ID Token with Google's official library
+    const googleClient = new OAuth2Client(currentGoogleClientId);
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: tokenToVerify,
+        audience: currentGoogleClientId,
+      });
+    } catch (verifyError: any) {
+      console.warn('Google token verification failed:', verifyError?.message || 'Invalid token');
+      return res.status(401).json({
+        error: 'Invalid or expired Google authentication token. Please sign in again.',
+      });
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(401).json({ error: 'Failed to extract verified identity from Google token.' });
+    }
+
+    // Verify required claims: sub and email
+    const googleSub = payload.sub;
+    const email = payload.email;
+    const emailVerified = payload.email_verified;
+
+    if (!googleSub || !email) {
+      return res.status(400).json({ error: 'Google account missing verified user identifier or email.' });
+    }
+
+    if (!emailVerified) {
+      return res.status(403).json({
+        error: 'Google email address is not verified. Please verify your Google account email first.',
+      });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const userRole = role === 'official' ? 'official' : 'citizen';
+    // Verified Google display name:
+    const googleDisplayName = (payload.name && payload.name.trim()) ||
+      (payload.given_name ? `${payload.given_name} ${payload.family_name || ''}`.trim() : '') ||
+      normalizedEmail.split('@')[0];
 
+    // Find existing user by email
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
 
     if (!user) {
-      const passwordHash = await bcrypt.hash(`google-auth-${Date.now()}`, 10);
-      let derivedName = (name && name.trim()) || '';
-      if (!derivedName && normalizedEmail.includes('@')) {
-        const raw = normalizedEmail.split('@')[0];
-        derivedName = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/[^a-zA-Z]/g, ' ');
-      }
+      // First-time sign in with Google: create account in PostgreSQL
+      // Safe random un-guessable password hash so the account has a valid string in schema
+      const unusablePasswordHash = await bcrypt.hash(`oauth_google_${crypto.randomUUID()}_${Date.now()}`, 10);
+
+      // New Google accounts always default to citizen role (never authority)
+      const userRole = 'citizen';
 
       user = await prisma.user.create({
         data: {
-          name: derivedName || 'Google User',
+          name: googleDisplayName,
           email: normalizedEmail,
-          passwordHash,
+          passwordHash: unusablePasswordHash,
           role: userRole,
-          ward: userRole === 'citizen' ? 'Ward 12 - Shivajinagar' : null,
-          department: userRole === 'official' ? 'Roads & Infrastructure' : null,
-          employeeId: userRole === 'official' ? `PMC-OFF-${Math.floor(1000 + Math.random() * 9000)}` : null,
+          ward: 'Ward 12 - Shivajinagar',
+          department: null,
+          employeeId: null,
           isDemo: false,
         },
       });
+    } else {
+      // Existing user: preserve their existing role (official or citizen),
+      // update name to Google name if user had a default/placeholder name
+      if (!user.name || user.name === 'Civic User' || user.name === 'Google User') {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { name: googleDisplayName },
+        });
+      }
     }
 
+    // Issue existing CivicFix JWT session
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -286,9 +345,9 @@ router.post('/google', async (req: Request, res: Response) => {
         isDemo: user.isDemo,
       },
     });
-  } catch (error) {
-    console.error('Google login error:', error);
-    return res.status(500).json({ error: 'Failed to process Google sign in.' });
+  } catch (error: any) {
+    console.error('Internal Google auth error:', error?.message || 'Unknown error');
+    return res.status(500).json({ error: 'Authentication service encountered an unexpected error.' });
   }
 });
 
