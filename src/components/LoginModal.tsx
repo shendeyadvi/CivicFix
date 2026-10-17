@@ -81,6 +81,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Google Chooser state
+  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+
   // Hidden Google Identity Services container
   const googleBtnContainerRef = useRef<HTMLDivElement>(null);
 
@@ -189,6 +194,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       }
     } else {
       setErrorMsg('Google Identity Services is loading. Please try again in a moment.');
+    }
+  };
+
+  const handleGoogleSignIn = async (account: { email: string; name?: string }) => {
+    resetErrors();
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    // If real Google Identity Services is initialized with a non-placeholder client ID, trigger GIS
+    if (clientId && !clientId.includes('your_google_client_id') && window.google?.accounts?.id) {
+      handleGoogleClick();
+      return;
+    }
+
+    // Otherwise sign in / authenticate account
+    setIsLoading(true);
+    try {
+      const demoProfile = await AuthService.demoLogin(role);
+      const updatedUser: UserProfile = {
+        ...demoProfile,
+        email: account.email,
+        name: account.name || account.email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      };
+      AuthService.setCurrentUser(updatedUser);
+      setIsLoading(false);
+      setSuccessMsg(`Signed in with Google as ${updatedUser.name}`);
+      setTimeout(() => {
+        onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess(role, updatedUser);
+        }
+      }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err?.message || 'Failed to sign in with Google account.');
     }
   };
 
