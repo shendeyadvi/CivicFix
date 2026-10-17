@@ -43,6 +43,32 @@ export interface AIAnalysisResponse {
   tags?: string[];
 }
 
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  confidence: number;
+  duplicateCount: number;
+  isCertainMatch: boolean;
+  matchReason?: string;
+  existingReport?: {
+    id: string;
+    trackingId: string;
+    title: string;
+    category: string;
+    location: string;
+    status: string;
+    distanceMeters: number;
+    upvotes: number;
+    imageUrl?: string;
+    date?: string;
+    reportedAgo?: string;
+    description?: string;
+  };
+}
+
+export type AddReportResponse =
+  | { type: 'created'; report: CivicReportItem }
+  | { type: 'duplicate'; duplicateInfo: DuplicateCheckResult };
+
 // In-memory cache for ultra-responsive UI renders
 let memoryCache: CivicReportItem[] = [];
 let isInitialized = false;
@@ -76,14 +102,40 @@ export class ReportsService {
     return memoryCache;
   }
 
-  // Submit a new civic report to the backend database
-  public static async addReport(report: Partial<CivicReportItem>): Promise<CivicReportItem> {
-    const response = await ApiClient.post<{ message: string; report: CivicReportItem }>('/api/reports', report);
+  // Submit a new civic report to the backend database with duplicate detection
+  public static async addReport(
+    report: Partial<CivicReportItem> & { forceNew?: boolean }
+  ): Promise<AddReportResponse> {
+    const response = await ApiClient.post<any>('/api/reports', report);
+    if (response?.potentialDuplicate) {
+      return {
+        type: 'duplicate',
+        duplicateInfo: response,
+      };
+    }
     if (!response || !response.report) {
       throw new Error('Backend failed to create report record in database.');
     }
     await this.fetchReports(); // Refresh global list from PostgreSQL database
-    return response.report;
+    return {
+      type: 'created',
+      report: response.report,
+    };
+  }
+
+  // Support an existing complaint (records support in PostgreSQL, increments support count)
+  public static async supportReport(idOrTrackingId: string): Promise<{
+    alreadySupported: boolean;
+    message: string;
+    report: CivicReportItem;
+  }> {
+    const res = await ApiClient.post<{
+      alreadySupported: boolean;
+      message: string;
+      report: CivicReportItem;
+    }>(`/api/reports/${encodeURIComponent(idOrTrackingId)}/support`);
+    await this.fetchReports();
+    return res;
   }
 
   // Track report by ticket tracking ID from backend database
@@ -145,24 +197,19 @@ export class ReportsService {
   }
 
   // Check duplicate report in proximity
-  public static async checkDuplicate(category: string, lat: number, lng: number, title?: string) {
+  public static async checkDuplicate(params: {
+    category: string;
+    lat: number;
+    lng: number;
+    title?: string;
+    description?: string;
+    imageUrl?: string;
+    radiusMeters?: number;
+  }): Promise<DuplicateCheckResult> {
     try {
-      return await ApiClient.post<{
-        isDuplicate: boolean;
-        confidence: number;
-        duplicateCount: number;
-        existingReport?: {
-          id: string;
-          trackingId: string;
-          title: string;
-          category: string;
-          location: string;
-          status: string;
-          distanceMeters: number;
-        };
-      }>('/api/reports/check-duplicate', { category, lat, lng, title });
+      return await ApiClient.post<DuplicateCheckResult>('/api/reports/check-duplicate', params);
     } catch {
-      return { isDuplicate: false, confidence: 0, duplicateCount: 0 };
+      return { isDuplicate: false, confidence: 0, duplicateCount: 0, isCertainMatch: false };
     }
   }
 

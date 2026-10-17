@@ -211,3 +211,95 @@ If IT IS a relevant civic issue:
   }
   throw new Error(friendlyMsg);
 }
+
+export interface ImageComparisonResult {
+  isSameDefect: boolean;
+  confidence: number;
+  reason: string;
+}
+
+export async function compareCivicImagesWithGemini(
+  image1Buffer: Buffer,
+  mimeType1: string,
+  image2Buffer: Buffer,
+  mimeType2: string
+): Promise<ImageComparisonResult | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey || apiKey.trim() === '') {
+    return null;
+  }
+
+  const client = new GoogleGenAI({ apiKey });
+
+  const prompt = `You are an expert civic infrastructure diagnostic AI inspector.
+Compare the two provided images (Image 1 and Image 2) taken in the same geographic vicinity.
+Determine whether Image 1 and Image 2 depict the EXACT SAME physical civic infrastructure defect (e.g. the same physical pothole on the road surface, the same broken streetlight pole, the same garbage mound, the same leaking pipe rupture) or TWO DIFFERENT distinct defects at nearby locations.
+
+Carefully examine:
+1. Defect morphology (shape, crater depth, surrounding pavement cracks, curb features, road markings, size).
+2. Background context, lighting, and surrounding environment.
+3. Distinguish whether differences are simply due to camera perspective/angles of the same defect vs. two separate defects.
+
+Return ONLY a valid JSON object matching this structure with no markdown code blocks:
+{
+  "isSameDefect": true or false,
+  "confidence": 0.0 to 1.0,
+  "reason": "Detailed concise explanation of the visual comparison and defect matching rationale."
+}`;
+
+  const MODEL_FALLBACKS = [
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+  ];
+
+  const base64_1 = image1Buffer.toString('base64');
+  const base64_2 = image2Buffer.toString('base64');
+
+  const contentPayload = {
+    role: 'user' as const,
+    parts: [
+      { text: prompt },
+      { inlineData: { data: base64_1, mimeType: mimeType1 || 'image/jpeg' } },
+      { inlineData: { data: base64_2, mimeType: mimeType2 || 'image/jpeg' } },
+    ],
+  };
+
+  for (const model of MODEL_FALLBACKS) {
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents: [contentPayload],
+        config: { responseMimeType: 'application/json' },
+      });
+
+      const responseText = response.text || '';
+      if (!responseText.trim()) {
+        continue;
+      }
+
+      const cleaned = responseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      const isSameDefect = Boolean(parsed.isSameDefect);
+      const confidence = typeof parsed.confidence === 'number'
+        ? Math.min(Math.max(parsed.confidence, 0), 1)
+        : 0.8;
+
+      return {
+        isSameDefect,
+        confidence,
+        reason: parsed.reason || 'Visual comparison completed.',
+      };
+    } catch (err: any) {
+      console.warn(`[GeminiVision] Compare model ${model} issue:`, err?.message || err);
+      // Try next model
+    }
+  }
+
+  return null;
+}
+

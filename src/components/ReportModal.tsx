@@ -17,9 +17,12 @@ import {
   Navigation,
   Building2,
   RefreshCw,
-  Check
+  Check,
+  ThumbsUp,
+  PlusCircle,
+  Users
 } from 'lucide-react';
-import { ReportsService } from '../services/reportsService';
+import { ReportsService, type DuplicateCheckResult } from '../services/reportsService';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -86,11 +89,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   onClose,
   onIssueCreated,
 }) => {
-  const [step, setStep] = useState<'form' | 'success'>('form');
+  const [step, setStep] = useState<'form' | 'duplicate' | 'success'>('form');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [category, setCategory] = useState<string>('Roads & Potholes');
   const [title, setTitle] = useState<string>('');
   const [location, setLocation] = useState<string>('FC Road (near Goodluck Cafe), Shivajinagar, Pune');
+  const [lat, setLat] = useState<number>(18.5204);
+  const [lng, setLng] = useState<number>(73.8415);
   const [description, setDescription] = useState<string>('');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('High');
   const [department, setDepartment] = useState<string>('Roads & Infrastructure');
@@ -106,6 +111,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const [generatedTicketId, setGeneratedTicketId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Duplicate Detection & Support state
+  const [duplicateMatch, setDuplicateMatch] = useState<DuplicateCheckResult | null>(null);
+  const [isSupporting, setIsSupporting] = useState<boolean>(false);
+  const [supportedTicketInfo, setSupportedTicketInfo] = useState<{
+    trackingId: string;
+    title: string;
+    status: string;
+    upvotes: number;
+    department?: string;
+    alreadySupported: boolean;
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -221,13 +238,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const latStr = lat.toFixed(4);
-          const lngStr = lng.toFixed(4);
-          const latDir = lat >= 0 ? 'N' : 'S';
-          const lngDir = lng >= 0 ? 'E' : 'W';
-          setGpsCoords(`${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lng).toFixed(4)}° ${lngDir}`);
+          const latVal = pos.coords.latitude;
+          const lngVal = pos.coords.longitude;
+          setLat(latVal);
+          setLng(lngVal);
+          const latStr = latVal.toFixed(4);
+          const lngStr = lngVal.toFixed(4);
+          const latDir = latVal >= 0 ? 'N' : 'S';
+          const lngDir = lngVal >= 0 ? 'E' : 'W';
+          setGpsCoords(`${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`);
 
           // Reverse geocode to get actual address
           try {
@@ -266,24 +285,96 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setSubmitError(null);
 
     try {
-      const created = await ReportsService.addReport({
+      const res = await ReportsService.addReport({
         title: title || 'Civic Complaint',
         category,
         location,
         description: description || 'Citizen reported issue via CivicFix app.',
         priority,
         image: photoPreview || undefined,
+        lat,
+        lng,
+        forceNew: false,
       });
-      setGeneratedTicketId(created.trackingId);
+
+      if (res.type === 'duplicate') {
+        // Potential duplicate found: present to citizen rather than creating another ticket
+        setDuplicateMatch(res.duplicateInfo);
+        setStep('duplicate');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setGeneratedTicketId(res.report.trackingId);
+      setSupportedTicketInfo(null);
       setIsSubmitting(false);
       setStep('success');
       if (onIssueCreated) {
-        onIssueCreated(created.trackingId);
+        onIssueCreated(res.report.trackingId);
       }
     } catch (err: any) {
       console.error('Submit error:', err);
       setIsSubmitting(false);
       setSubmitError(err?.message || 'Unable to connect to CivicFix server. Your report was not submitted.');
+    }
+  };
+
+  // Support the existing registered complaint
+  const handleSupportExisting = async () => {
+    if (!duplicateMatch?.existingReport) return;
+    setIsSupporting(true);
+    setSubmitError(null);
+
+    try {
+      const result = await ReportsService.supportReport(duplicateMatch.existingReport.id);
+      setSupportedTicketInfo({
+        trackingId: result.report.trackingId,
+        title: result.report.title,
+        status: result.report.status,
+        upvotes: result.report.upvotes,
+        department: result.report.department,
+        alreadySupported: result.alreadySupported,
+      });
+      setIsSupporting(false);
+      setStep('success');
+    } catch (err: any) {
+      console.error('Support error:', err);
+      setIsSupporting(false);
+      setSubmitError(err?.message || 'Failed to record support for existing complaint.');
+    }
+  };
+
+  // Confirm separate reporting when citizen confirms issues are distinct
+  const handleConfirmSeparateReport = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await ReportsService.addReport({
+        title: title || 'Civic Complaint',
+        category,
+        location,
+        description: description || 'Citizen reported issue via CivicFix app.',
+        priority,
+        image: photoPreview || undefined,
+        lat,
+        lng,
+        forceNew: true, // Citizen confirmed distinct defect
+      });
+
+      if (res.type === 'created') {
+        setGeneratedTicketId(res.report.trackingId);
+        setSupportedTicketInfo(null);
+        setIsSubmitting(false);
+        setStep('success');
+        if (onIssueCreated) {
+          onIssueCreated(res.report.trackingId);
+        }
+      }
+    } catch (err: any) {
+      console.error('Separate submit error:', err);
+      setIsSubmitting(false);
+      setSubmitError(err?.message || 'Failed to submit separate report.');
     }
   };
 
@@ -298,6 +389,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setAiError(null);
     setSubmitError(null);
     setAiConfidence(null);
+    setDuplicateMatch(null);
+    setSupportedTicketInfo(null);
     onClose();
   };
 
@@ -310,18 +403,42 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         {/* Header Bar */}
         <div className="bg-slate-100 dark:bg-[#0F1E33] px-6 py-4 border-b border-slate-200 dark:border-[#1E355B] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-deepTeal-50 dark:bg-deepTeal-950 border border-deepTeal-200 dark:border-deepTeal-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-deepTeal-600 dark:text-softMint-400 animate-pulse" />
+            <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+              step === 'duplicate'
+                ? 'bg-amber-500/10 border-amber-500/30'
+                : 'bg-deepTeal-50 dark:bg-deepTeal-950 border-deepTeal-200 dark:border-deepTeal-600'
+            }`}>
+              {step === 'duplicate' ? (
+                <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-deepTeal-600 dark:text-softMint-400 animate-pulse" />
+              )}
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                {step === 'form' ? 'AI-Assisted Civic Reporting' : 'Complaint Submitted Successfully'}
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-emerald-300 border border-teal-500/20 uppercase tracking-wider">
-                  AI Powered
+                {step === 'form'
+                  ? 'AI-Assisted Civic Reporting'
+                  : step === 'duplicate'
+                  ? 'Potential Duplicate Civic Issue'
+                  : supportedTicketInfo
+                  ? 'Complaint Support Registered'
+                  : 'Complaint Submitted Successfully'}
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  step === 'duplicate'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                    : 'bg-teal-500/10 text-teal-700 dark:text-emerald-300 border border-teal-500/20'
+                }`}>
+                  {step === 'duplicate' ? 'Proximity Match' : 'AI Powered'}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                {step === 'form' ? 'Upload photo — AI auto-fills description, category & department' : 'Official Pune PMC ticket dispatched'}
+                {step === 'form'
+                  ? 'Upload photo — AI auto-fills description, category & department'
+                  : step === 'duplicate'
+                  ? 'A matching complaint already exists at this location. Support it or report separately.'
+                  : supportedTicketInfo
+                  ? 'Support added to existing PMC complaint'
+                  : 'Official Pune PMC ticket dispatched'}
               </p>
             </div>
           </div>
@@ -854,40 +971,172 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 </div>
               )}
             </form>
+          ) : step === 'duplicate' && duplicateMatch?.existingReport ? (
+            /* Duplicate Candidate Resolution View */
+            <div className="space-y-5 animate-in fade-in duration-200 py-1">
+              {/* Proximity & Defect Match Warning Banner */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-amber-900 dark:text-amber-200 text-sm">
+                      Potential Duplicate Issue Detected
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-bold">
+                      📍 {duplicateMatch.existingReport.distanceMeters}m away
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-bold">
+                      {Math.round(duplicateMatch.confidence * 100)}% match
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                    {duplicateMatch.matchReason || 'An active complaint matching this defect at this physical location is already registered.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Existing Complaint Spotlight Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#081220] border-2 border-teal-500/30 dark:border-teal-600/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-teal-700 dark:text-emerald-400 font-bold">
+                    Existing Active Complaint
+                  </span>
+                  <span className="text-xs font-mono font-extrabold text-teal-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">
+                    {duplicateMatch.existingReport.trackingId}
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {duplicateMatch.existingReport.imageUrl && (
+                    <div className="relative w-full sm:w-36 h-28 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 shrink-0">
+                      <img
+                        src={duplicateMatch.existingReport.imageUrl}
+                        alt="Existing defect evidence"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-1.5">
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                      {duplicateMatch.existingReport.title}
+                    </h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                      {duplicateMatch.existingReport.description || 'On-site civic grievance recorded in Pune PMC grievance database.'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-[#0F1E33] text-slate-700 dark:text-slate-300 font-medium">
+                        {duplicateMatch.existingReport.category}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
+                        ● {duplicateMatch.existingReport.status}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-emerald-300 font-bold flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {duplicateMatch.existingReport.upvotes} Citizens Supported
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informational Guidance */}
+              <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-[#0F1E33] border border-slate-200 dark:border-[#1E355B] text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <strong className="text-slate-900 dark:text-white block mb-0.5">What would you like to do?</strong>
+                Supporting this existing complaint adds your vote to raise its priority with Pune Municipal Corporation (PMC) officials without creating duplicate tickets. If your report shows a distinct, separate defect nearby, you may submit it as a new report.
+              </div>
+
+              {submitError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-[#1E355B]">
+                <button
+                  type="button"
+                  onClick={handleSupportExisting}
+                  disabled={isSupporting}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 text-slate-950 font-bold text-sm shadow-glow-teal hover:shadow-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ThumbsUp className="w-4 h-4 text-slate-950" />
+                  <span>
+                    {isSupporting
+                      ? 'Recording Support in Database...'
+                      : `Support Existing Complaint (${duplicateMatch.existingReport.trackingId})`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmSeparateReport}
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 rounded-xl bg-white dark:bg-[#0F1E33] border border-slate-300 dark:border-[#1E355B] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#162846] text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>This is a Different Defect — Submit as Separate Report</span>
+                </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setStep('form')}
+                    className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  >
+                    ← Back to Edit Report Details
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
             /* Success View */
-            <div className="text-center py-6 space-y-6">
+            <div className="text-center py-6 space-y-6 animate-in fade-in duration-200">
               <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-teal-950 border-2 border-emerald-500 mx-auto flex items-center justify-center shadow-glow-mint">
                 <CheckCircle2 className="w-9 h-9 text-emerald-500" />
               </div>
 
               <div>
                 <span className="text-xs font-mono uppercase tracking-widest text-teal-600 dark:text-emerald-400 font-bold">
-                  Official Work Order Generated
+                  {supportedTicketInfo ? 'Citizen Support Registered' : 'Official Work Order Generated'}
                 </span>
                 <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
-                  Thank You for Fixing Pune!
+                  {supportedTicketInfo
+                    ? supportedTicketInfo.alreadySupported
+                      ? 'Complaint Already Supported!'
+                      : 'Support Successfully Added!'
+                    : 'Thank You for Fixing Pune!'}
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto mt-2">
-                  Your AI-verified complaint has been logged and routed to <strong>{department}</strong>.
+                  {supportedTicketInfo
+                    ? supportedTicketInfo.alreadySupported
+                      ? `You have already supported complaint ${supportedTicketInfo.trackingId}. Duplicate votes from the same citizen are prevented.`
+                      : `Your support has been registered for complaint ${supportedTicketInfo.trackingId}. PMC prioritizes grievances with higher citizen support.`
+                    : `Your AI-verified complaint has been logged and routed to ${department}.`}
                 </p>
               </div>
 
-              {/* Generated Ticket Box */}
+              {/* Generated / Supported Ticket Box */}
               <div className="p-5 rounded-2xl bg-slate-50 dark:bg-[#081220] border-2 border-teal-500 dark:border-emerald-500 max-w-md mx-auto shadow-sm">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">Your Tracking Ticket ID:</div>
-                <div className="text-2xl sm:text-3xl font-mono font-extrabold text-teal-700 dark:text-emerald-300 tracking-wider my-1">
-                  {generatedTicketId}
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                  {supportedTicketInfo ? 'Complaint Tracking Ticket ID:' : 'Your Tracking Ticket ID:'}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Save this ID to track updates or subscribe to SMS alerts.
+                <div className="text-2xl sm:text-3xl font-mono font-extrabold text-teal-700 dark:text-emerald-300 tracking-wider my-1">
+                  {supportedTicketInfo ? supportedTicketInfo.trackingId : generatedTicketId}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 pt-1 flex-wrap">
+                  {supportedTicketInfo ? (
+                    <span>Status: <strong>{supportedTicketInfo.status}</strong> · {supportedTicketInfo.upvotes} Total Supporters</span>
+                  ) : (
+                    <span>Save this ID to track updates or subscribe to SMS alerts.</span>
+                  )}
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   onClick={handleReset}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm transition-all"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm transition-all cursor-pointer"
                 >
                   Done & Back to Home
                 </button>

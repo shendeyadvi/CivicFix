@@ -45,6 +45,38 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
 });
 
+// Format report to match frontend interface
+function formatReport(r: any) {
+  return {
+    id: r.id,
+    trackingId: r.trackingId,
+    title: r.title,
+    category: r.category,
+    location: r.location,
+    ward: r.ward,
+    priority: r.priority,
+    department: r.department,
+    assignedTo: r.assignedTo,
+    status: r.status,
+    date: r.date,
+    reportedAgo: r.reportedAgo,
+    citizenName: r.citizenName,
+    citizenPhone: r.citizenPhone,
+    description: r.description,
+    lat: r.lat,
+    lng: r.lng,
+    upvotes: r.upvotesCount,
+    image: r.imageUrl || undefined,
+    timeline: (r.timeline || []).map((t: any) => ({
+      step: t.step,
+      date: t.date,
+      completed: t.completed,
+      current: t.current,
+      note: t.note || undefined,
+    })),
+  };
+}
+
 // GET /api/reports - Fetch all reports
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -82,36 +114,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
 
-    // Format reports to match frontend interface
-    const formatted = reports.map((r) => ({
-      id: r.id,
-      trackingId: r.trackingId,
-      title: r.title,
-      category: r.category,
-      location: r.location,
-      ward: r.ward,
-      priority: r.priority,
-      department: r.department,
-      assignedTo: r.assignedTo,
-      status: r.status,
-      date: r.date,
-      reportedAgo: r.reportedAgo,
-      citizenName: r.citizenName,
-      citizenPhone: r.citizenPhone,
-      description: r.description,
-      lat: r.lat,
-      lng: r.lng,
-      upvotes: r.upvotesCount,
-      image: r.imageUrl || undefined,
-      timeline: r.timeline.map((t) => ({
-        step: t.step,
-        date: t.date,
-        completed: t.completed,
-        current: t.current,
-        note: t.note || undefined,
-      })),
-    }));
-
+    const formatted = reports.map(formatReport);
     return res.json(formatted);
   } catch (error) {
     console.error('Fetch reports error:', error);
@@ -179,55 +182,44 @@ router.get('/track/:trackingId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Report not found with tracking ID: ' + trackingId });
     }
 
-    return res.json({
-      id: report.id,
-      trackingId: report.trackingId,
-      title: report.title,
-      category: report.category,
-      location: report.location,
-      ward: report.ward,
-      priority: report.priority,
-      department: report.department,
-      assignedTo: report.assignedTo,
-      status: report.status,
-      date: report.date,
-      reportedAgo: report.reportedAgo,
-      citizenName: report.citizenName,
-      citizenPhone: report.citizenPhone,
-      description: report.description,
-      lat: report.lat,
-      lng: report.lng,
-      upvotes: report.upvotesCount,
-      image: report.imageUrl || undefined,
-      timeline: report.timeline.map((t) => ({
-        step: t.step,
-        date: t.date,
-        completed: t.completed,
-        current: t.current,
-        note: t.note || undefined,
-      })),
-    });
+    return res.json(formatReport(report));
   } catch (error) {
     return res.status(500).json({ error: 'Failed to track report.' });
   }
 });
 
-// POST /api/reports/check-duplicate - Proximity & category deduplication check
+// POST /api/reports/check-duplicate - Proximity, defect keyword & AI deduplication check
 router.post('/check-duplicate', async (req: Request, res: Response) => {
   try {
-    const { category, lat, lng, title } = req.body;
+    const { category, lat, lng, title, description, imageUrl, radiusMeters } = req.body;
     if (!category || lat === undefined || lng === undefined) {
       return res.status(400).json({ error: 'category, lat, and lng are required.' });
     }
 
-    const result = await checkDuplicateCivicReport(category, Number(lat), Number(lng), title);
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      return res.status(400).json({ error: 'lat and lng must be valid numbers.' });
+    }
+
+    const result = await checkDuplicateCivicReport({
+      category: String(category),
+      lat: parsedLat,
+      lng: parsedLng,
+      title: title ? String(title) : undefined,
+      description: description ? String(description) : undefined,
+      imageUrl: imageUrl ? String(imageUrl) : undefined,
+      radiusMeters: radiusMeters !== undefined ? parseFloat(radiusMeters) : undefined,
+    });
+
     return res.json(result);
   } catch (error) {
+    console.error('Check duplicate error:', error);
     return res.status(500).json({ error: 'Failed to check duplicates.' });
   }
 });
 
-// POST /api/reports - Submit a new civic report
+// POST /api/reports - Submit a new civic report (with server-side duplicate prevention)
 router.post('/', authenticateToken, upload.single('imageFile'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
@@ -243,13 +235,69 @@ router.post('/', authenticateToken, upload.single('imageFile'), async (req: Auth
       lat,
       lng,
       image, // base64 or URL passed in JSON
+      forceNew, // when true, user confirmed separate submission despite duplicate detection
     } = req.body;
 
+    const shouldForceNew = forceNew === true || forceNew === 'true' || forceNew === 1 || forceNew === '1';
+
     let imageUrl: string | null = null;
+    let imageBuffer: Buffer | undefined = undefined;
+    let imageMimeType: string | undefined = undefined;
+
     if (req.file) {
       imageUrl = `/uploads/${req.file.filename}`;
+      try {
+        if (req.file.path && fs.existsSync(req.file.path)) {
+          imageBuffer = fs.readFileSync(req.file.path);
+          imageMimeType = req.file.mimetype;
+        }
+      } catch (fErr) {
+        console.warn('Could not read uploaded file buffer for duplicate comparison:', fErr);
+      }
     } else if (image && typeof image === 'string' && image.length > 0) {
       imageUrl = image;
+      if (image.startsWith('data:')) {
+        const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          imageMimeType = matches[1];
+          imageBuffer = Buffer.from(matches[2], 'base64');
+        }
+      }
+    }
+
+    const cat = category || 'Roads & Potholes';
+    const parsedLat = lat !== undefined && lat !== '' ? parseFloat(lat) : 18.5204 + (Math.random() * 0.04 - 0.02);
+    const parsedLng = lng !== undefined && lng !== '' ? parseFloat(lng) : 73.8567 + (Math.random() * 0.04 - 0.02);
+
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      return res.status(400).json({ error: 'Invalid geographic coordinates provided.' });
+    }
+
+    // Server-side duplicate verification before creating a new report
+    // If a potential duplicate exists and user has NOT explicitly forced separate submission,
+    // return the existing complaint rather than creating another independent complaint.
+    if (!shouldForceNew) {
+      const duplicateResult = await checkDuplicateCivicReport({
+        category: cat,
+        lat: parsedLat,
+        lng: parsedLng,
+        title: title || '',
+        description: description || '',
+        imageBuffer,
+        imageMimeType,
+        imageUrl: imageUrl || undefined,
+      });
+
+      if (duplicateResult.isDuplicate && duplicateResult.existingReport) {
+        return res.status(200).json({
+          potentialDuplicate: true,
+          message: 'A potential duplicate civic report was identified at this location.',
+          confidence: duplicateResult.confidence,
+          isCertainMatch: duplicateResult.isCertainMatch,
+          matchReason: duplicateResult.matchReason,
+          existingReport: duplicateResult.existingReport,
+        });
+      }
     }
 
     let randomNum = Math.floor(1000 + Math.random() * 9000);
@@ -262,7 +310,6 @@ router.post('/', authenticateToken, upload.single('imageFile'), async (req: Auth
     }
 
     let resolvedDept = department || 'Roads & Infrastructure';
-    const cat = category || 'Roads & Potholes';
     if (!department) {
       if (cat.includes('Light')) resolvedDept = 'Electrical';
       else if (cat.includes('Waste') || cat.includes('Sanitation')) resolvedDept = 'Sanitation';
@@ -275,9 +322,6 @@ router.post('/', authenticateToken, upload.single('imageFile'), async (req: Auth
       month: 'short',
       year: 'numeric',
     });
-
-    const parsedLat = lat ? parseFloat(lat) : 18.5204 + (Math.random() * 0.04 - 0.02);
-    const parsedLng = lng ? parseFloat(lng) : 73.8567 + (Math.random() * 0.04 - 0.02);
 
     const report = await prisma.report.create({
       data: {
@@ -309,38 +353,137 @@ router.post('/', authenticateToken, upload.single('imageFile'), async (req: Auth
         },
       },
       include: {
-        timeline: true,
+        timeline: { orderBy: { order: 'asc' } },
       },
     });
 
     return res.status(201).json({
       message: 'Report created successfully',
-      report: {
-        id: report.id,
-        trackingId: report.trackingId,
-        title: report.title,
-        category: report.category,
-        location: report.location,
-        ward: report.ward,
-        priority: report.priority,
-        department: report.department,
-        assignedTo: report.assignedTo,
-        status: report.status,
-        date: report.date,
-        reportedAgo: report.reportedAgo,
-        citizenName: report.citizenName,
-        citizenPhone: report.citizenPhone,
-        description: report.description,
-        lat: report.lat,
-        lng: report.lng,
-        upvotes: report.upvotesCount,
-        image: report.imageUrl || undefined,
-        timeline: report.timeline,
-      },
+      report: formatReport(report),
     });
   } catch (error) {
     console.error('Create report error:', error);
     return res.status(500).json({ error: 'Failed to submit report.' });
+  }
+});
+
+// POST /api/reports/:id/support - Support an existing complaint (prevents duplicate tickets)
+router.post('/:id/support', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId || null;
+    const ipAddress = req.ip || null;
+
+    // 1. Verify target report exists in PostgreSQL database
+    const report = await prisma.report.findFirst({
+      where: { OR: [{ id }, { trackingId: id }] },
+      include: {
+        timeline: { orderBy: { order: 'asc' } },
+      },
+    });
+
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found with tracking ID: ' + id });
+    }
+
+    // 2. Perform support registration using Prisma transaction to prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      if (userId) {
+        // Authenticated citizen check: prevent duplicate support from same user
+        const existingUpvote = await tx.upvote.findUnique({
+          where: {
+            reportId_userId: {
+              reportId: report.id,
+              userId,
+            },
+          },
+        });
+
+        if (existingUpvote) {
+          return {
+            alreadySupported: true,
+            message: `You have already supported complaint ${report.trackingId}.`,
+            report,
+          };
+        }
+
+        // Record citizen support in PostgreSQL
+        await tx.upvote.create({
+          data: {
+            reportId: report.id,
+            userId,
+            ipAddress,
+          },
+        });
+
+        // Increment complaint's support count atomically
+        const updated = await tx.report.update({
+          where: { id: report.id },
+          data: { upvotesCount: { increment: 1 } },
+          include: {
+            timeline: { orderBy: { order: 'asc' } },
+          },
+        });
+
+        return {
+          alreadySupported: false,
+          message: `Your support for complaint ${report.trackingId} has been registered!`,
+          report: updated,
+        };
+      } else {
+        // Anonymous support: check for recent support from same IP to curb spam
+        if (ipAddress) {
+          const recentVote = await tx.upvote.findFirst({
+            where: {
+              reportId: report.id,
+              ipAddress,
+              createdAt: {
+                gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24h window
+              },
+            },
+          });
+
+          if (recentVote) {
+            return {
+              alreadySupported: true,
+              message: `Support from your network was already registered recently for ${report.trackingId}.`,
+              report,
+            };
+          }
+        }
+
+        await tx.upvote.create({
+          data: {
+            reportId: report.id,
+            userId: null,
+            ipAddress,
+          },
+        });
+
+        const updated = await tx.report.update({
+          where: { id: report.id },
+          data: { upvotesCount: { increment: 1 } },
+          include: {
+            timeline: { orderBy: { order: 'asc' } },
+          },
+        });
+
+        return {
+          alreadySupported: false,
+          message: `Support for complaint ${report.trackingId} recorded successfully.`,
+          report: updated,
+        };
+      }
+    });
+
+    return res.json({
+      alreadySupported: result.alreadySupported,
+      message: result.message,
+      report: formatReport(result.report),
+    });
+  } catch (error) {
+    console.error('Support report error:', error);
+    return res.status(500).json({ error: 'Failed to record support for report.' });
   }
 });
 
