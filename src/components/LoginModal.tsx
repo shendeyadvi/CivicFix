@@ -15,7 +15,8 @@ import {
   LogIn,
   MapPin,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  ChevronRight
 } from 'lucide-react';
 
 import { AuthService, type UserProfile } from '../services/authService';
