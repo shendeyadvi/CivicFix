@@ -28,7 +28,7 @@ export const AppContent: React.FC = () => {
     const u = AuthService.getCurrentUser();
     return String(u?.role || '').toLowerCase() === 'official' ? 'official' : 'citizen';
   });
-  const [view, setView] = useState<'landing' | 'dashboard'>(() => AuthService.getCurrentUser() ? 'dashboard' : 'landing');
+  const [view, setView] = useState<'landing' | 'dashboard'>('landing');
 
   useEffect(() => {
     const handleAuthUpdate = (e: any) => {
