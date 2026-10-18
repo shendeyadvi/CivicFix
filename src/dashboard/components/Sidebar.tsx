@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-200 dark:border-slate-800">
               <span>Active Issues:</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300">{reportCount}</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">{totalReportCount}</span>
             </div>
           </div>
         </div>
