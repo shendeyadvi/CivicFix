@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, UserCheck, Sun, Moon } from 'lucide-react';
+import { Menu, X, LogIn, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavbarProps {
@@ -120,13 +120,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Login / Dashboard Button */}
+            {/* Login Button */}
             <button
-              onClick={currentUser ? (onNavigateToDashboard || onOpenLoginModal) : onOpenLoginModal}
+              onClick={onOpenLoginModal}
               className="px-3.5 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0F1E33] rounded-lg transition-colors border border-transparent hover:border-slate-300 dark:hover:border-[#1E355B] flex items-center gap-1.5"
             >
-              <UserCheck className="w-4 h-4 text-deepTeal-600 dark:text-sageGreen-400" />
-              <span>{currentUser ? 'Dashboard' : 'Login'}</span>
+              <LogIn className="w-4 h-4 text-deepTeal-600 dark:text-sageGreen-400" />
+              <span>Login</span>
             </button>
           </div>
 
@@ -177,16 +177,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  if (currentUser && onNavigateToDashboard) {
-                    onNavigateToDashboard();
-                  } else {
-                    onOpenLoginModal();
-                  }
+                  onOpenLoginModal();
                 }}
                 className="w-full py-2.5 px-3 rounded-lg bg-slate-100 dark:bg-[#0F1E33] border border-slate-300 dark:border-[#1E355B] text-slate-800 dark:text-slate-200 text-sm font-medium flex items-center justify-center gap-2"
               >
-                <UserCheck className="w-4 h-4 text-deepTeal-600 dark:text-sageGreen-400" />
-                {currentUser ? 'Go to Dashboard' : 'Citizen & Official Login'}
+                <LogIn className="w-4 h-4 text-deepTeal-600 dark:text-sageGreen-400" />
+                <span>Citizen & Official Login</span>
               </button>
             </div>
           </div>
