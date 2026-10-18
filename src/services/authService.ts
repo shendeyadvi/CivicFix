@@ -97,6 +97,14 @@ export const AuthService = {
     return response.user;
   },
 
+  async loginWithGoogleAccessToken(accessToken: string): Promise<UserProfile> {
+    const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/google', {
+      accessToken,
+    });
+    this.setCurrentUser(response.user, response.token);
+    return response.user;
+  },
+
   getInitials(name: string): string {
     if (!name) return 'CF';
     const parts = name.trim().split(' ').filter(Boolean);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   User,
@@ -80,15 +80,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Hidden Google Identity Services container
-  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
-
   const resetErrors = () => {
     setErrorMsg('');
     setSuccessMsg('');
   };
 
-  // Process verified ID token returned by Google Identity Services
+  // Process verified ID token returned by Google Identity Services One-Tap or callback
   const handleGoogleCredentialResponse = async (response: any) => {
     if (!response || !response.credential) {
       setErrorMsg('Google Sign-In was cancelled or did not return a credential.');
@@ -131,18 +128,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             auto_select: false,
             cancel_on_tap_outside: true,
           });
-
-          if (googleBtnContainerRef.current) {
-            googleBtnContainerRef.current.innerHTML = '';
-            const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-            window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
-              type: 'standard',
-              theme: isDark ? 'filled_black' : 'outline',
-              size: 'large',
-              text: 'continue_with',
-              shape: 'rectangular',
-              });
-          }
         } catch (e) {
           console.warn('GIS initialize error:', e);
         }
@@ -169,15 +154,46 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       return;
     }
     resetErrors();
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed()) {
-          const btn = googleBtnContainerRef.current?.querySelector('div[role=button], iframe') as HTMLElement;
-          if (btn) {
-            btn.click();
-          }
-        }
-      });
+
+    // 1. Try Google OAuth2 popup via google.accounts.oauth2 (official API for custom buttons)
+    if (window.google?.accounts?.oauth2) {
+      setIsLoading(true);
+      try {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'email profile openid',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse.error) {
+              setIsLoading(false);
+              if (tokenResponse.error !== 'popup_closed_by_user') {
+                setErrorMsg(tokenResponse.error_description || `Google Sign-In failed: ${tokenResponse.error}`);
+              }
+              return;
+            }
+            try {
+              const userProfile = await AuthService.loginWithGoogleAccessToken(tokenResponse.access_token);
+              setIsLoading(false);
+              setSuccessMsg(`Welcome, ${userProfile.name}! Signed in with Google.`);
+              setTimeout(() => {
+                onClose();
+                if (onLoginSuccess) {
+                  onLoginSuccess(userProfile.role as 'citizen' | 'official' || 'citizen', userProfile);
+                }
+              }, 500);
+            } catch (err: any) {
+              setIsLoading(false);
+              setErrorMsg(err.message || 'Failed to authenticate with Google. Please try again.');
+            }
+          },
+        });
+        tokenClient.requestAccessToken({ prompt: 'select_account' });
+      } catch (err: any) {
+        setIsLoading(false);
+        setErrorMsg(err.message || 'Failed to open Google Sign-In popup.');
+      }
+    } else if (window.google?.accounts?.id) {
+      // 2. Fallback to Google ID prompt if oauth2 is not yet ready
+      window.google.accounts.id.prompt();
     } else {
       setErrorMsg('Google services are still loading. Please try again in a moment.');
     }
@@ -445,8 +461,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
           {/* Continue with Google Section */}
           <div className="space-y-3 pt-1">
-            {/* Hidden container for Google Identity Services initialization */}
-            <div ref={googleBtnContainerRef} className="absolute -top-[9999px] -left-[9999px] opacity-0 pointer-events-none" />
 
             {/* Google button (identical on localhost and Vercel) */}
             <button

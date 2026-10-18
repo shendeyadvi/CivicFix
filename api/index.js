@@ -236,10 +236,10 @@ router.get("/me", authenticateToken, async (req, res) => {
 });
 router.post("/google", async (req, res) => {
   try {
-    const { idToken, credential } = req.body;
+    const { idToken, credential, accessToken } = req.body;
     const tokenToVerify = idToken || credential;
-    if (!tokenToVerify) {
-      return res.status(400).json({ error: "Google ID token is required for authentication." });
+    if (!tokenToVerify && !accessToken) {
+      return res.status(400).json({ error: "Google authentication token is required." });
     }
     const currentGoogleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
     if (!currentGoogleClientId) {
@@ -248,25 +248,59 @@ router.post("/google", async (req, res) => {
       });
     }
     const googleClient = new OAuth2Client(currentGoogleClientId);
-    let ticket;
-    try {
-      ticket = await googleClient.verifyIdToken({
-        idToken: tokenToVerify,
-        audience: currentGoogleClientId
-      });
-    } catch (verifyError) {
-      console.warn("Google token verification failed:", verifyError?.message || "Invalid token");
-      return res.status(401).json({
-        error: "Invalid or expired Google authentication token. Please sign in again."
-      });
+    let googleSub;
+    let email;
+    let emailVerified = false;
+    let googleDisplayName = "";
+    if (accessToken) {
+      try {
+        const tokenInfo = await googleClient.getTokenInfo(accessToken);
+        if (!tokenInfo || !tokenInfo.email) {
+          return res.status(401).json({ error: "Invalid Google access token." });
+        }
+      } catch (err) {
+        console.warn("Google access token verification failed:", err?.message || "Invalid token");
+        return res.status(401).json({ error: "Invalid or expired Google access token. Please sign in again." });
+      }
+      try {
+        const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!userInfoRes.ok) {
+          return res.status(401).json({ error: "Failed to retrieve profile from Google." });
+        }
+        const userInfo = await userInfoRes.json();
+        googleSub = userInfo.sub;
+        email = userInfo.email;
+        emailVerified = Boolean(userInfo.email_verified);
+        googleDisplayName = userInfo.name && userInfo.name.trim() || (userInfo.given_name ? `${userInfo.given_name} ${userInfo.family_name || ""}`.trim() : "") || (email ? email.split("@")[0] : "Google User");
+      } catch (fetchErr) {
+        console.error("Error fetching Google userinfo:", fetchErr);
+        return res.status(500).json({ error: "Failed to fetch Google profile." });
+      }
+    } else {
+      let ticket;
+      try {
+        ticket = await googleClient.verifyIdToken({
+          idToken: tokenToVerify,
+          audience: currentGoogleClientId
+        });
+      } catch (verifyError) {
+        console.warn("Google token verification failed:", verifyError?.message || "Invalid token");
+        return res.status(401).json({
+          error: "Invalid or expired Google authentication token. Please sign in again."
+        });
+      }
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(401).json({ error: "Failed to extract verified identity from Google token." });
+      }
+      googleSub = payload.sub;
+      email = payload.email;
+      emailVerified = Boolean(payload.email_verified);
+      const normalized = email ? email.trim().toLowerCase() : "";
+      googleDisplayName = payload.name && payload.name.trim() || (payload.given_name ? `${payload.given_name} ${payload.family_name || ""}`.trim() : "") || normalized.split("@")[0];
     }
-    const payload = ticket.getPayload();
-    if (!payload) {
-      return res.status(401).json({ error: "Failed to extract verified identity from Google token." });
-    }
-    const googleSub = payload.sub;
-    const email = payload.email;
-    const emailVerified = payload.email_verified;
     if (!googleSub || !email) {
       return res.status(400).json({ error: "Google account missing verified user identifier or email." });
     }
@@ -276,7 +310,6 @@ router.post("/google", async (req, res) => {
       });
     }
     const normalizedEmail = email.trim().toLowerCase();
-    const googleDisplayName = payload.name && payload.name.trim() || (payload.given_name ? `${payload.given_name} ${payload.family_name || ""}`.trim() : "") || normalizedEmail.split("@")[0];
     let user = await prisma.user.findUnique({
       where: { email: normalizedEmail }
     });
