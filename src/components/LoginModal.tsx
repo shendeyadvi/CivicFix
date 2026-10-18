@@ -135,9 +135,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
           if (googleBtnContainerRef.current) {
             googleBtnContainerRef.current.innerHTML = '';
+            const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
             window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
               type: 'standard',
-              theme: 'outline',
+              theme: isDark ? 'filled_black' : 'outline',
               size: 'large',
               text: 'continue_with',
               shape: 'rectangular',
@@ -445,13 +446,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               className={`flex justify-center ${isGisRendered ? 'block' : 'hidden'}`}
             />
 
-            {/* White Google button fallback (always visible when GIS iframe is not active) */}
+            {/* Google button (matching website theme) */}
             {!isGisRendered && (
               <button
                 type="button"
                 onClick={handleGoogleClick}
                 disabled={isLoading}
-                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-[#1E355B] bg-white dark:bg-[#0F1E33] hover:bg-slate-50 dark:hover:bg-[#162846] hover:border-slate-400 dark:hover:border-deepTeal-500/60 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
               >
                 <GoogleIcon />
                 <span>{isLoading ? 'Signing in with Google…' : 'Continue with Google'}</span>
