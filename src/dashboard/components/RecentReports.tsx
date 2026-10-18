@@ -10,9 +10,12 @@ import {
   PlusCircle,
   Droplets,
   ShieldAlert,
-  ImageIcon
+  ImageIcon,
+  Loader2,
+  LogIn
 } from 'lucide-react';
 import { ReportsService, type CivicReportItem } from '../../services/reportsService';
+import { ApiClient } from '../../services/apiClient';
 
 interface RecentReportsProps {
   onViewAll?: () => void;
@@ -26,24 +29,48 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
   onOpenReport
 }) => {
   const [reportsList, setReportsList] = useState<CivicReportItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(Boolean(ApiClient.getToken()));
 
-  const loadReports = () => {
-    setReportsList(ReportsService.getReports());
+  const loadMyReports = async () => {
+    const token = ApiClient.getToken();
+    if (!token) {
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      return;
+    }
+    setIsAuthenticated(true);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const myReports = await ReportsService.fetchMyReports();
+      setReportsList(myReports);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load your reports. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadReports();
-    const handleUpdate = () => loadReports();
-    window.addEventListener('civicfix_reports_updated', handleUpdate);
+    loadMyReports();
+
+    // Re-fetch when auth state changes (login / logout)
+    const handleAuthUpdate = () => {
+      setIsAuthenticated(Boolean(ApiClient.getToken()));
+      loadMyReports();
+    };
+    window.addEventListener('civicfix_auth_updated', handleAuthUpdate);
     return () => {
-      window.removeEventListener('civicfix_reports_updated', handleUpdate);
+      window.removeEventListener('civicfix_auth_updated', handleAuthUpdate);
     };
   }, []);
 
   const handleDelete = (e: React.MouseEvent, id: string, title: string) => {
     e.stopPropagation();
     if (window.confirm(`Are you sure you want to delete report "${title}"?`)) {
-      ReportsService.deleteReport(id);
+      ReportsService.deleteReport(id).then(() => loadMyReports()).catch(console.error);
     }
   };
 
@@ -70,6 +97,50 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
         return '#3B82F6';
     }
   };
+
+  // Not signed in
+  if (!isAuthenticated) {
+    return (
+      <div className="rounded-2xl bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-slate-800 p-8 text-center flex flex-col items-center justify-center shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
+          <LogIn className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white">Sign in to see your reports</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+          Your personal report history is linked to your account. Please sign in to view them.
+        </p>
+      </div>
+    );
+  }
+
+  // Loading
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-slate-800 p-8 text-center flex flex-col items-center justify-center shadow-xs">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500 mb-3" />
+        <p className="text-sm text-slate-500 dark:text-slate-400">Loading your reports…</p>
+      </div>
+    );
+  }
+
+  // Error
+  if (error) {
+    return (
+      <div className="rounded-2xl bg-white dark:bg-[#0B192C] border border-slate-200 dark:border-slate-800 p-8 text-center flex flex-col items-center justify-center shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center mb-3">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white">Could not load reports</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{error}</p>
+        <button
+          onClick={loadMyReports}
+          className="mt-4 px-4 py-2 rounded-xl bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-colors cursor-pointer"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   if (!reportsList || reportsList.length === 0) {
     return (

@@ -73,45 +73,26 @@ router.post('/register', async (req: Request, res: Response) => {
 // Login user
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email/Identifier and password are required.' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    let user = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
 
-    // If user does not exist in DB yet, create an account on first login to ensure seamless experience
+    // Reject unknown accounts — do NOT silently create an account on login
     if (!user) {
-      const passwordHash = await bcrypt.hash(password, 10);
-      const userRole = role === 'official' ? 'official' : 'citizen';
-      let name = 'Civic User';
-      if (normalizedEmail.includes('@')) {
-        const raw = normalizedEmail.split('@')[0];
-        name = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/[^a-zA-Z]/g, ' ');
-      }
+      return res.status(401).json({ error: 'No account found with that email. Please register first.' });
+    }
 
-      user = await prisma.user.create({
-        data: {
-          name,
-          email: normalizedEmail,
-          passwordHash,
-          role: userRole,
-          ward: userRole === 'citizen' ? 'Ward 12 - Shivajinagar' : null,
-          department: userRole === 'official' ? 'Roads & Infrastructure' : null,
-          employeeId: userRole === 'official' ? `PMC-OFF-${Math.floor(1000 + Math.random() * 9000)}` : null,
-          isDemo: false,
-        },
-      });
-    } else {
-      // If user exists, verify password (or allow demo/fallback match)
-      const valid = await bcrypt.compare(password, user.passwordHash).catch(() => false);
-      if (!valid && password !== 'password123' && !user.isDemo) {
-        return res.status(401).json({ error: 'Incorrect password. Please try again.' });
-      }
+    // Verify password — allow demo bypass only for flagged demo accounts
+    const valid = await bcrypt.compare(password, user.passwordHash).catch(() => false);
+    if (!valid && !user.isDemo) {
+      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
     }
 
     const token = generateToken({

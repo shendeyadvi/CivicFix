@@ -84,7 +84,7 @@ export class ReportsService {
     window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: reports }));
   }
 
-  // Fetch all reports from the real backend API
+  // Fetch all reports from the real backend API (used for public/community feeds)
   public static async loadReports(): Promise<CivicReportItem[]> {
     return this.fetchReports();
   }
@@ -101,6 +101,21 @@ export class ReportsService {
     }
     return memoryCache;
   }
+
+  // Fetch ONLY the authenticated user's own reports from the backend (enforced server-side)
+  public static async fetchMyReports(): Promise<CivicReportItem[]> {
+    const reports = await ApiClient.get<CivicReportItem[]>('/api/reports/my');
+    if (!Array.isArray(reports)) return [];
+    return reports;
+  }
+
+  // Clear the in-memory cache — call on logout or account switch to prevent cross-account data leakage
+  public static clearCache(): void {
+    memoryCache = [];
+    isInitialized = false;
+    window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: [] }));
+  }
+
 
   // Submit a new civic report to the backend database with duplicate detection
   public static async addReport(

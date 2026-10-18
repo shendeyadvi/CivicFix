@@ -43,6 +43,8 @@ export const AuthService = {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       ApiClient.removeToken();
+      // Clear the in-memory reports cache to prevent cross-account data leakage
+      window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: [] }));
       window.dispatchEvent(new CustomEvent('civicfix_auth_updated', { detail: null }));
     } catch {
       // ignore
@@ -50,49 +52,21 @@ export const AuthService = {
   },
 
   async login(email: string, password: string, role: 'citizen' | 'official'): Promise<UserProfile> {
-    try {
-      const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/login', {
-        email,
-        password,
-        role,
-      });
-
-      this.setCurrentUser(response.user, response.token);
-      return response.user;
-    } catch (err) {
-      console.warn('Backend login unavailable, falling back to local session:', err);
-      const fallbackUser: UserProfile = {
-        name: email.includes('@') ? email.split('@')[0] : 'Civic Resident',
-        email,
-        role,
-        isDemo: false,
-      };
-      this.setCurrentUser(fallbackUser);
-      return fallbackUser;
-    }
+    const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/login', {
+      email,
+      password,
+      role,
+    });
+    this.setCurrentUser(response.user, response.token);
+    return response.user;
   },
 
   async register(data: Partial<UserProfile> & { password: string }): Promise<UserProfile> {
-    try {
-      const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/register', data);
-      this.setCurrentUser(response.user, response.token);
-      return response.user;
-    } catch (err) {
-      console.warn('Backend register unavailable, falling back to local session:', err);
-      const fallbackUser: UserProfile = {
-        name: data.name || 'Civic Resident',
-        email: data.email || 'user@example.com',
-        phone: data.phone,
-        role: data.role || 'citizen',
-        ward: data.ward,
-        department: data.department,
-        employeeId: data.employeeId,
-        isDemo: false,
-      };
-      this.setCurrentUser(fallbackUser);
-      return fallbackUser;
-    }
+    const response = await ApiClient.post<{ token: string; user: UserProfile }>('/api/auth/register', data);
+    this.setCurrentUser(response.user, response.token);
+    return response.user;
   },
+
 
   async demoLogin(role: 'citizen' | 'official'): Promise<UserProfile> {
     try {

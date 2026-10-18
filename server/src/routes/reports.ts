@@ -77,6 +77,32 @@ function formatReport(r: any) {
   };
 }
 
+// GET /api/reports/my - Fetch reports owned by the currently authenticated citizen (requires auth)
+router.get('/my', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in to view your reports.' });
+  }
+
+  try {
+    const userId = req.user.userId;
+
+    const reports = await prisma.report.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        timeline: {
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    return res.json(reports.map(formatReport));
+  } catch (error) {
+    console.error('Fetch my reports error:', error);
+    return res.status(500).json({ error: 'Failed to fetch your reports.' });
+  }
+});
+
 // GET /api/reports - Fetch all reports
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -664,9 +690,13 @@ router.post('/:id/upvote', authenticateToken, async (req: AuthenticatedRequest, 
   }
 });
 
-// DELETE /api/reports/:id - Delete report
+// DELETE /api/reports/:id - Delete report (citizen can only delete their own; officials can delete any)
 router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+
     const { id } = req.params;
     const report = await prisma.report.findFirst({
       where: { OR: [{ id }, { trackingId: id }] },
@@ -674,6 +704,11 @@ router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res: 
 
     if (!report) {
       return res.status(404).json({ error: 'Report not found.' });
+    }
+
+    // Citizens can only delete their own reports
+    if (req.user.role === 'citizen' && report.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'You are not authorised to delete this report.' });
     }
 
     await prisma.report.delete({ where: { id: report.id } });
