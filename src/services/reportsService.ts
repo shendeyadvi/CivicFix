@@ -77,12 +77,12 @@ let isInitialized = false;
 export class ReportsService {
   // Synchronous getter from in-memory cache (safe for immediate component render)
   public static getReports(): CivicReportItem[] {
-    return memoryCache;
+    return Array.isArray(memoryCache) ? memoryCache : [];
   }
 
   // Synchronous getter for current authenticated user's own reports
   public static getMyReports(): CivicReportItem[] {
-    return myReportsCache;
+    return Array.isArray(myReportsCache) ? myReportsCache : [];
   }
 
   private static notifyChange(reports: CivicReportItem[]) {

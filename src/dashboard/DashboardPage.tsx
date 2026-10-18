@@ -100,8 +100,9 @@ const MyReportsView: React.FC<ViewProps> = ({ onOpenReport, onOpenTrack }) => {
     };
   }, []);
 
-  const totalMyReported = personalReports.length;
-  const totalMyResolved = personalReports.filter((r) => r.status === 'Resolved' || r.status === 'Closed').length;
+  const reportsList = Array.isArray(personalReports) ? personalReports : [];
+  const totalMyReported = reportsList.length;
+  const totalMyResolved = reportsList.filter((r) => r.status === 'Resolved' || r.status === 'Closed').length;
 
   return (
     <div className="space-y-6">

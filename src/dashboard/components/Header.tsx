@@ -35,9 +35,9 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  const myTrackingIds = new Set(myReports.map((r) => r.trackingId));
+  const myTrackingIds = new Set((myReports || []).map((r) => r.trackingId));
 
-  const notifications = reports.slice(0, 5).map((r, idx) => {
+  const notifications = (reports || []).slice(0, 5).map((r, idx) => {
     const isMine = myTrackingIds.has(r.trackingId);
     return {
       id: idx + 1,

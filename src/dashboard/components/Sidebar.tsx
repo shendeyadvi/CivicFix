@@ -33,12 +33,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onBackToLanding
 }) => {
   const { theme, toggleTheme } = useTheme();
-  const [myReportCount, setMyReportCount] = useState<number>(() => ReportsService.getMyReports().length);
-  const [totalReportCount, setTotalReportCount] = useState<number>(() => ReportsService.getReports().length);
+  const [myReportCount, setMyReportCount] = useState<number>(() => (ReportsService.getMyReports() || []).length);
+  const [totalReportCount, setTotalReportCount] = useState<number>(() => (ReportsService.getReports() || []).length);
 
   const updateCounts = () => {
-    setTotalReportCount(ReportsService.getReports().length);
-    setMyReportCount(ReportsService.getMyReports().length);
+    setTotalReportCount((ReportsService.getReports() || []).length);
+    setMyReportCount((ReportsService.getMyReports() || []).length);
   };
 
   useEffect(() => {

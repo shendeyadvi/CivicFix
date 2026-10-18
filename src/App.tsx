@@ -14,6 +14,7 @@ import { TrackModal } from './components/TrackModal';
 import { LoginModal } from './components/LoginModal';
 import { DashboardPage } from './dashboard/DashboardPage';
 import { AuthorityDashboardPage } from './dashboard/authority/AuthorityDashboardPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { AuthService, type UserProfile } from './services/authService';
 
@@ -27,7 +28,7 @@ export const AppContent: React.FC = () => {
     const u = AuthService.getCurrentUser();
     return String(u?.role || '').toLowerCase() === 'official' ? 'official' : 'citizen';
   });
-  const [view, setView] = useState<'landing' | 'dashboard'>(() => AuthService.getCurrentUser() ? 'dashboard' : 'landing');
+  const [view, setView] = useState<'landing' | 'dashboard'>('landing');
 
   useEffect(() => {
     const handleAuthUpdate = (e: any) => {
@@ -162,10 +163,13 @@ export const AppContent: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 
 export default App;
+
