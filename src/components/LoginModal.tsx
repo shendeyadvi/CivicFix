@@ -142,7 +142,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               size: 'large',
               text: 'continue_with',
               shape: 'rectangular',
-              width: 320,
+              width: 340,
             });
             setIsGisRendered(true);
           }
@@ -438,13 +438,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             </div>
           </div>
 
-          {/* Continue with Google Section - Single White Button */}
+          {/* Continue with Google Section */}
           <div className="space-y-3 pt-1">
             {/* GIS rendered container (active when Google script loads and renders) */}
             <div
-              ref={googleBtnContainerRef}
-              className={`flex justify-center ${isGisRendered ? 'block' : 'hidden'}`}
-            />
+              style={{ colorScheme: 'light' }}
+              className={`gsi-button-wrapper flex justify-center w-full overflow-hidden [&_iframe]:!bg-transparent [&>div]:!bg-transparent ${isGisRendered ? 'flex' : 'hidden'}`}
+            >
+              <div ref={googleBtnContainerRef} />
+            </div>
 
             {/* Google button (matching website theme) */}
             {!isGisRendered && (

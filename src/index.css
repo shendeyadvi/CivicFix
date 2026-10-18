@@ -92,6 +92,15 @@
   background: radial-gradient(circle, rgba(45, 212, 191, 0.12) 0%, rgba(248, 250, 252, 0) 70%);
 }
 
+/* Google Identity Services Dark Mode iframe background fix */
+.gsi-button-wrapper,
+.gsi-button-wrapper iframe,
+.gsi-button-wrapper > div {
+  color-scheme: light !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
 /* Subtle glassmorphic and card borders */
 .dark .civic-card {
   background: #0F1E33;
