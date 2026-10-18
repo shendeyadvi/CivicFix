@@ -56,6 +56,7 @@ const GoogleIcon = () => (
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [role, setRole] = useState<'citizen' | 'official'>('citizen');
+  const [isGisRendered, setIsGisRendered] = useState(false);
   
   // Sign In state
   const [signInIdentifier, setSignInIdentifier] = useState('');
@@ -142,6 +143,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               shape: 'rectangular',
               width: 320,
             });
+            setIsGisRendered(true);
           }
         } catch (e) {
           console.warn('GIS initialize error:', e);
@@ -165,31 +167,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
   const handleGoogleClick = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
-      setErrorMsg('Google Sign-In is not configured. Please add VITE_GOOGLE_CLIENT_ID to your environment.');
+      setErrorMsg('Please add VITE_GOOGLE_CLIENT_ID to your .env file to enable Google authentication.');
       return;
     }
-
-    resetErrors();
-
     if (window.google?.accounts?.id) {
-      // Prompt One-tap / account chooser or trigger rendered button
-      try {
-        window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed()) {
-            // If prompt is suppressed (e.g. third-party cookies or browser policy), click the rendered iframe button
-            const iframe = googleBtnContainerRef.current?.querySelector('div[role=button]') as HTMLElement;
-            if (iframe) {
-              iframe.click();
-            }
-          }
-        });
-      } catch (err: any) {
-        setErrorMsg('Could not open Google sign in. Please verify popup permissions.');
-      }
+      window.google.accounts.id.prompt();
     } else {
-      setErrorMsg('Google Identity Services is loading. Please try again in a moment.');
+      setErrorMsg('Google services are still loading. Please try again in a moment.');
     }
   };
+
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -450,21 +437,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             </div>
           </div>
 
-          {/* Continue with Google Section - Real GIS Only */}
+          {/* Continue with Google Section - Single White Button */}
           <div className="space-y-3 pt-1">
-            {/* Real GIS rendered button (hidden container — GIS injects its own iframe) */}
-            <div ref={googleBtnContainerRef} className="flex justify-center" />
+            {/* GIS rendered container (active when Google script loads and renders) */}
+            <div
+              ref={googleBtnContainerRef}
+              className={`flex justify-center ${isGisRendered ? 'block' : 'hidden'}`}
+            />
 
-            {/* Visible Continue with Google click target */}
-            <button
-              type="button"
-              onClick={handleGoogleClick}
-              disabled={isLoading}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-[#1E355B] bg-white dark:bg-[#0F1E33] hover:bg-slate-50 dark:hover:bg-[#162846] text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
-            >
-              <GoogleIcon />
-              <span>{isLoading ? 'Signing in with Google…' : 'Continue with Google'}</span>
-            </button>
+            {/* White Google button fallback (always visible when GIS iframe is not active) */}
+            {!isGisRendered && (
+              <button
+                type="button"
+                onClick={handleGoogleClick}
+                disabled={isLoading}
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+              >
+                <GoogleIcon />
+                <span>{isLoading ? 'Signing in with Google…' : 'Continue with Google'}</span>
+              </button>
+            )}
 
             <div className="relative flex py-0.5 items-center">
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
