@@ -56,7 +56,6 @@ const GoogleIcon = () => (
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [role, setRole] = useState<'citizen' | 'official'>('citizen');
-  const [isGisRendered, setIsGisRendered] = useState(false);
   
   // Sign In state
   const [signInIdentifier, setSignInIdentifier] = useState('');
@@ -142,9 +141,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               size: 'large',
               text: 'continue_with',
               shape: 'rectangular',
-              width: 340,
-            });
-            setIsGisRendered(true);
+              });
           }
         } catch (e) {
           console.warn('GIS initialize error:', e);
@@ -171,8 +168,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       setErrorMsg('Please add VITE_GOOGLE_CLIENT_ID to your .env file to enable Google authentication.');
       return;
     }
+    resetErrors();
     if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
+      window.google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed()) {
+          const btn = googleBtnContainerRef.current?.querySelector('div[role=button], iframe') as HTMLElement;
+          if (btn) {
+            btn.click();
+          }
+        }
+      });
     } else {
       setErrorMsg('Google services are still loading. Please try again in a moment.');
     }
@@ -440,26 +445,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
           {/* Continue with Google Section */}
           <div className="space-y-3 pt-1">
-            {/* GIS rendered container (active when Google script loads and renders) */}
-            <div
-              style={{ colorScheme: 'light' }}
-              className={`gsi-button-wrapper flex justify-center w-full overflow-hidden [&_iframe]:!bg-transparent [&>div]:!bg-transparent ${isGisRendered ? 'flex' : 'hidden'}`}
-            >
-              <div ref={googleBtnContainerRef} />
-            </div>
+            {/* Hidden container for Google Identity Services initialization */}
+            <div ref={googleBtnContainerRef} className="absolute -top-[9999px] -left-[9999px] opacity-0 pointer-events-none" />
 
-            {/* Google button (matching website theme) */}
-            {!isGisRendered && (
-              <button
-                type="button"
-                onClick={handleGoogleClick}
-                disabled={isLoading}
-                className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-[#1E355B] bg-white dark:bg-[#0F1E33] hover:bg-slate-50 dark:hover:bg-[#162846] hover:border-slate-400 dark:hover:border-deepTeal-500/60 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
-              >
-                <GoogleIcon />
-                <span>{isLoading ? 'Signing in with Google…' : 'Continue with Google'}</span>
-              </button>
-            )}
+            {/* Google button (identical on localhost and Vercel) */}
+            <button
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-[#1E355B] bg-white dark:bg-[#0F1E33] hover:bg-slate-50 dark:hover:bg-[#162846] hover:border-slate-400 dark:hover:border-deepTeal-500/60 text-slate-800 dark:text-slate-100 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
+            >
+              <GoogleIcon />
+              <span>{isLoading ? 'Signing in with Google…' : 'Continue with Google'}</span>
+            </button>
 
             <div className="relative flex py-0.5 items-center">
               <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
