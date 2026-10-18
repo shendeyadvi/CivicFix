@@ -207,6 +207,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const userName = user?.name || "Citizen Resident";
   const userWard = user?.ward || "Ward 12 · Shivajinagar / FC Road, Pune";
 
+  useEffect(() => {
+    ReportsService.fetchReports();
+    ReportsService.fetchMyReports();
+  }, []);
+
   const handleOpenReport = (category?: string) => {
     if (onOpenReportModal) onOpenReportModal(category);
   };

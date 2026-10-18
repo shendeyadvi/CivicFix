@@ -36,6 +36,7 @@ export const AuthService = {
       }
       ReportsService.clearCache();
       ReportsService.fetchMyReports();
+      ReportsService.fetchReports();
       window.dispatchEvent(new CustomEvent('civicfix_auth_updated', { detail: user }));
     } catch {
       // ignore
@@ -47,6 +48,7 @@ export const AuthService = {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       ApiClient.removeToken();
       ReportsService.clearCache();
+      ReportsService.fetchReports();
       window.dispatchEvent(new CustomEvent('civicfix_auth_updated', { detail: null }));
     } catch {
       // ignore

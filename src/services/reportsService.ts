@@ -129,12 +129,9 @@ export class ReportsService {
     return myReportsCache;
   }
 
-  // Clear all in-memory caches — call on logout or account switch to prevent cross-account data leakage
+  // Clear user-specific in-memory cache — call on logout or account switch to prevent cross-account data leakage
   public static clearCache(): void {
-    memoryCache = [];
     myReportsCache = [];
-    isInitialized = false;
-    window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: [] }));
     window.dispatchEvent(new CustomEvent('civicfix_my_reports_updated', { detail: [] }));
   }
 

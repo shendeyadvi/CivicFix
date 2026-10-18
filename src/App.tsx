@@ -22,9 +22,12 @@ export const AppContent: React.FC = () => {
   const [trackModalOpen, setTrackModalOpen] = useState(false);
   const [trackingIdForTrack, setTrackingIdForTrack] = useState<string | undefined>(undefined);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [view, setView] = useState<'landing' | 'dashboard'>('landing');
-  const [userRole, setUserRole] = useState<'citizen' | 'official'>('citizen');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => AuthService.getCurrentUser());
+  const [userRole, setUserRole] = useState<'citizen' | 'official'>(() => {
+    const u = AuthService.getCurrentUser();
+    return String(u?.role || '').toLowerCase() === 'official' ? 'official' : 'citizen';
+  });
+  const [view, setView] = useState<'landing' | 'dashboard'>(() => AuthService.getCurrentUser() ? 'dashboard' : 'landing');
 
   useEffect(() => {
     const handleAuthUpdate = (e: any) => {
@@ -32,6 +35,10 @@ export const AppContent: React.FC = () => {
       setCurrentUser(user);
       if (!user) {
         setView('landing');
+      } else {
+        const roleNorm = String(user.role || '').toLowerCase() === 'official' ? 'official' : 'citizen';
+        setUserRole(roleNorm);
+        setView('dashboard');
       }
     };
     window.addEventListener('civicfix_auth_updated', handleAuthUpdate);
@@ -71,7 +78,8 @@ export const AppContent: React.FC = () => {
           isOpen={loginModalOpen}
           onClose={() => setLoginModalOpen(false)}
           onLoginSuccess={(role, profile) => {
-            setUserRole(role);
+            const roleNorm = String(role || '').toLowerCase() === 'official' ? 'official' : 'citizen';
+            setUserRole(roleNorm);
             if (profile) {
               setCurrentUser(profile);
             }
@@ -86,6 +94,8 @@ export const AppContent: React.FC = () => {
     <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#081220] text-slate-900 dark:text-slate-100 font-sans relative selection:bg-deepTeal-600 selection:text-white transition-colors duration-300">
       {/* Top Fixed Navigation with Theme Toggle */}
       <Navbar
+        currentUser={currentUser}
+        onNavigateToDashboard={() => setView('dashboard')}
         onOpenReportModal={() => setReportModalOpen(true)}
         onOpenTrackModal={() => setTrackModalOpen(true)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
