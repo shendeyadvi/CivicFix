@@ -61,9 +61,21 @@ export const RecentReports: React.FC<RecentReportsProps> = ({
       setIsAuthenticated(Boolean(ApiClient.getToken()));
       loadMyReports();
     };
+
+    // Update list immediately when current user's personal reports update
+    const handleMyReportsUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setReportsList(e.detail);
+      } else {
+        loadMyReports();
+      }
+    };
+
     window.addEventListener('civicfix_auth_updated', handleAuthUpdate);
+    window.addEventListener('civicfix_my_reports_updated', handleMyReportsUpdate);
     return () => {
       window.removeEventListener('civicfix_auth_updated', handleAuthUpdate);
+      window.removeEventListener('civicfix_my_reports_updated', handleMyReportsUpdate);
     };
   }, []);
 

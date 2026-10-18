@@ -71,12 +71,18 @@ export type AddReportResponse =
 
 // In-memory cache for ultra-responsive UI renders
 let memoryCache: CivicReportItem[] = [];
+let myReportsCache: CivicReportItem[] = [];
 let isInitialized = false;
 
 export class ReportsService {
   // Synchronous getter from in-memory cache (safe for immediate component render)
   public static getReports(): CivicReportItem[] {
     return memoryCache;
+  }
+
+  // Synchronous getter for current authenticated user's own reports
+  public static getMyReports(): CivicReportItem[] {
+    return myReportsCache;
   }
 
   private static notifyChange(reports: CivicReportItem[]) {
@@ -104,18 +110,33 @@ export class ReportsService {
 
   // Fetch ONLY the authenticated user's own reports from the backend (enforced server-side)
   public static async fetchMyReports(): Promise<CivicReportItem[]> {
-    const reports = await ApiClient.get<CivicReportItem[]>('/api/reports/my');
-    if (!Array.isArray(reports)) return [];
-    return reports;
+    try {
+      const token = ApiClient.getToken();
+      if (!token) {
+        myReportsCache = [];
+        window.dispatchEvent(new CustomEvent('civicfix_my_reports_updated', { detail: [] }));
+        return [];
+      }
+      const reports = await ApiClient.get<CivicReportItem[]>('/api/reports/my');
+      if (Array.isArray(reports)) {
+        myReportsCache = reports;
+        window.dispatchEvent(new CustomEvent('civicfix_my_reports_updated', { detail: reports }));
+        return reports;
+      }
+    } catch (err) {
+      console.warn('Backend /api/reports/my unavailable:', err);
+    }
+    return myReportsCache;
   }
 
-  // Clear the in-memory cache — call on logout or account switch to prevent cross-account data leakage
+  // Clear all in-memory caches — call on logout or account switch to prevent cross-account data leakage
   public static clearCache(): void {
     memoryCache = [];
+    myReportsCache = [];
     isInitialized = false;
     window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: [] }));
+    window.dispatchEvent(new CustomEvent('civicfix_my_reports_updated', { detail: [] }));
   }
-
 
   // Submit a new civic report to the backend database with duplicate detection
   public static async addReport(
@@ -131,7 +152,8 @@ export class ReportsService {
     if (!response || !response.report) {
       throw new Error('Backend failed to create report record in database.');
     }
-    await this.fetchReports(); // Refresh global list from PostgreSQL database
+    // Refresh both personal reports and global public list from PostgreSQL database
+    await Promise.all([this.fetchMyReports(), this.fetchReports()]);
     return {
       type: 'created',
       report: response.report,
@@ -167,7 +189,7 @@ export class ReportsService {
   public static async deleteReport(idOrTrackingId: string): Promise<boolean> {
     try {
       await ApiClient.delete(`/api/reports/${encodeURIComponent(idOrTrackingId)}`);
-      await this.fetchReports();
+      await Promise.all([this.fetchMyReports(), this.fetchReports()]);
       return true;
     } catch (err) {
       console.error('Delete report error:', err);
@@ -282,14 +304,23 @@ if (typeof window !== 'undefined' && !isInitialized) {
   }
 
   ReportsService.fetchReports();
+  if (ApiClient.getToken()) {
+    ReportsService.fetchMyReports();
+  }
 
-  // Poll backend every 4 seconds to sync multi-user updates automatically across devices
+  // Poll backend every 5 seconds to sync multi-user updates automatically across devices
   setInterval(() => {
     ReportsService.fetchReports();
-  }, 4000);
+    if (ApiClient.getToken()) {
+      ReportsService.fetchMyReports();
+    }
+  }, 5000);
 
   // Sync on window focus
   window.addEventListener('focus', () => {
     ReportsService.fetchReports();
+    if (ApiClient.getToken()) {
+      ReportsService.fetchMyReports();
+    }
   });
 }

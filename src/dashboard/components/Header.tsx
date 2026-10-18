@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Search, MapPin, Check, ExternalLink, X, Sun, Moon } from 'lucide-react';
+import { Bell, Search, MapPin, Check, ExternalLink, X, Sun, Moon, LogOut } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { ReportsService, type CivicReportItem } from '../../services/reportsService';
+import { AuthService } from '../../services/authService';
 
 interface HeaderProps {
   userName?: string;
@@ -17,30 +18,47 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [reports, setReports] = useState<CivicReportItem[]>([]);
+  const [myReports, setMyReports] = useState<CivicReportItem[]>(() => ReportsService.getMyReports());
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const load = () => setReports(ReportsService.getReports());
+    const load = () => {
+      setReports(ReportsService.getReports());
+      setMyReports(ReportsService.getMyReports());
+    };
     load();
     window.addEventListener('civicfix_reports_updated', load);
-    return () => window.removeEventListener('civicfix_reports_updated', load);
+    window.addEventListener('civicfix_my_reports_updated', load);
+    return () => {
+      window.removeEventListener('civicfix_reports_updated', load);
+      window.removeEventListener('civicfix_my_reports_updated', load);
+    };
   }, []);
 
-  const notifications = reports.slice(0, 5).map((r, idx) => ({
-    id: idx + 1,
-    title: r.status === 'Resolved' ? 'Issue Resolved' : r.status === 'In Progress' ? 'Work In Progress' : 'Report Logged',
-    desc: `Your report "${r.title}" (${r.location}) is currently marked as ${r.status}.`,
-    time: r.reportedAgo || r.date,
-    unread: r.status !== 'Resolved',
-    type: 'status',
-    trackingId: r.trackingId
-  }));
+  const myTrackingIds = new Set(myReports.map((r) => r.trackingId));
+
+  const notifications = reports.slice(0, 5).map((r, idx) => {
+    const isMine = myTrackingIds.has(r.trackingId);
+    return {
+      id: idx + 1,
+      title: isMine
+        ? (r.status === 'Resolved' ? 'Your Issue Resolved' : r.status === 'In Progress' ? 'Your Work In Progress' : 'Your Report Logged')
+        : (r.status === 'Resolved' ? 'Civic Issue Resolved' : r.status === 'In Progress' ? 'Civic Work In Progress' : 'Civic Report Logged'),
+      desc: isMine
+        ? `Your report "${r.title}" (${r.location}) is currently marked as ${r.status}.`
+        : `Community issue "${r.title}" (${r.location}) is currently marked as ${r.status}.`,
+      time: r.reportedAgo || r.date,
+      unread: isMine && r.status !== 'Resolved',
+      type: 'status',
+      trackingId: r.trackingId
+    };
+  });
 
   const [unreadCount, setUnreadCount] = useState(notifications.filter((n) => n.unread).length);
 
   useEffect(() => {
     setUnreadCount(notifications.filter((n) => n.unread).length);
-  }, [reports]);
+  }, [reports, myReports]);
 
   return (
     <header className="w-full bg-white/90 dark:bg-[#081220]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-20 transition-colors duration-300">
@@ -157,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* User Avatar */}
+        {/* User Avatar & Logout */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-slate-800">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0F766E] to-[#14B8A6] dark:to-[#2DD4BF] flex items-center justify-center text-white dark:text-[#081220] font-black text-sm shadow-md">
             {userName.charAt(0)}
@@ -166,6 +184,14 @@ export const Header: React.FC<HeaderProps> = ({
             <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{userName}</p>
             <p className="text-[10px] text-teal-700 dark:text-teal-400 font-semibold">Verified Citizen</p>
           </div>
+          <button
+            onClick={() => AuthService.clearUser()}
+            title="Sign out / Switch account"
+            aria-label="Sign out"
+            className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </header>

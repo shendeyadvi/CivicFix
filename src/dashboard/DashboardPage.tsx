@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { MobileHeader, MobileBottomBar } from "./components/MobileNavigation";
 import { Header } from "./components/Header";
@@ -15,6 +15,7 @@ import { ContributionCard } from "./components/ContributionCard";
 import { DashboardFooter } from "./components/DashboardFooter";
 
 import { AuthService, type UserProfile } from "../services/authService";
+import { ReportsService, type CivicReportItem } from "../services/reportsService";
 
 interface DashboardPageProps {
   currentUser?: UserProfile | null;
@@ -79,28 +80,52 @@ const HomeView: React.FC<ViewProps> = ({ onOpenReport, onSelectTab }) => (
   </div>
 );
 
-const MyReportsView: React.FC<ViewProps> = ({ onOpenReport, onOpenTrack }) => (
-  <div className="space-y-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">My Reports</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">All civic issues you have reported — track status and updates.</p>
+const MyReportsView: React.FC<ViewProps> = ({ onOpenReport, onOpenTrack }) => {
+  const [personalReports, setPersonalReports] = useState<CivicReportItem[]>(() => ReportsService.getMyReports());
+
+  useEffect(() => {
+    setPersonalReports(ReportsService.getMyReports());
+    const handleUpdate = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setPersonalReports(e.detail);
+      } else {
+        setPersonalReports(ReportsService.getMyReports());
+      }
+    };
+    window.addEventListener('civicfix_my_reports_updated', handleUpdate);
+    window.addEventListener('civicfix_auth_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('civicfix_my_reports_updated', handleUpdate);
+      window.removeEventListener('civicfix_auth_updated', handleUpdate);
+    };
+  }, []);
+
+  const totalMyReported = personalReports.length;
+  const totalMyResolved = personalReports.filter((r) => r.status === 'Resolved' || r.status === 'Closed').length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">My Reports</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">All civic issues you have reported — track status and updates.</p>
+        </div>
+        <button
+          onClick={() => onOpenReport()}
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#0F766E] to-[#14B8A6] text-white text-sm font-bold shadow-md hover:brightness-110 transition-all"
+        >
+          + New Report
+        </button>
       </div>
-      <button
-        onClick={() => onOpenReport()}
-        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#0F766E] to-[#14B8A6] text-white text-sm font-bold shadow-md hover:brightness-110 transition-all"
-      >
-        + New Report
-      </button>
+      <RecentReports
+        onViewAll={() => {}}
+        onSelectReport={(id) => onOpenTrack(id)}
+        onOpenReport={() => onOpenReport()}
+      />
+      <ContributionCard totalReported={totalMyReported} totalResolved={totalMyResolved} />
     </div>
-    <RecentReports
-      onViewAll={() => {}}
-      onSelectReport={(id) => onOpenTrack(id)}
-      onOpenReport={() => onOpenReport()}
-    />
-    <ContributionCard />
-  </div>
-);
+  );
+};
 
 const NearbyView: React.FC<ViewProps> = ({ onOpenTrack }) => (
   <div className="space-y-6">

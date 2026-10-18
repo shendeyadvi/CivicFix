@@ -1,4 +1,5 @@
 import { ApiClient } from './apiClient';
+import { ReportsService } from './reportsService';
 
 export interface UserProfile {
   id?: string;
@@ -33,6 +34,8 @@ export const AuthService = {
       if (token) {
         ApiClient.setToken(token);
       }
+      ReportsService.clearCache();
+      ReportsService.fetchMyReports();
       window.dispatchEvent(new CustomEvent('civicfix_auth_updated', { detail: user }));
     } catch {
       // ignore
@@ -43,8 +46,7 @@ export const AuthService = {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       ApiClient.removeToken();
-      // Clear the in-memory reports cache to prevent cross-account data leakage
-      window.dispatchEvent(new CustomEvent('civicfix_reports_updated', { detail: [] }));
+      ReportsService.clearCache();
       window.dispatchEvent(new CustomEvent('civicfix_auth_updated', { detail: null }));
     } catch {
       // ignore

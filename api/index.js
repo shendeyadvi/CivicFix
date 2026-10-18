@@ -1245,6 +1245,9 @@ router2.post("/", authenticateToken, upload.single("imageFile"), async (req, res
       month: "short",
       year: "numeric"
     });
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: "Authentication required. Please sign in to submit a report." });
+    }
     const report = await prisma.report.create({
       data: {
         trackingId,
@@ -1258,13 +1261,13 @@ router2.post("/", authenticateToken, upload.single("imageFile"), async (req, res
         status: "New",
         date: formattedDate,
         reportedAgo: "Just now",
-        citizenName: citizenName || req.user?.name || "Aarav Deshmukh",
+        citizenName: req.user.name || citizenName || "Verified Citizen",
         citizenPhone: citizenPhone || "+91 98765 43210",
         description: description || "Citizen reported issue via CivicFix app.",
         lat: parsedLat,
         lng: parsedLng,
         imageUrl,
-        userId: req.user?.userId || null,
+        userId: req.user.userId,
         timeline: {
           create: [
             { step: "Report Submitted", date: formattedDate, completed: true, current: false, order: 1 },
@@ -1548,7 +1551,9 @@ router2.delete("/:id", authenticateToken, async (req, res) => {
     if (!report) {
       return res.status(404).json({ error: "Report not found." });
     }
-    if (req.user.role === "citizen" && report.userId !== req.user.userId) {
+    const userRole = String(req.user.role || "").toUpperCase();
+    const isAuthority = userRole === "OFFICIAL" || userRole === "ADMIN";
+    if (!isAuthority && report.userId !== req.user.userId) {
       return res.status(403).json({ error: "You are not authorised to delete this report." });
     }
     await prisma.report.delete({ where: { id: report.id } });

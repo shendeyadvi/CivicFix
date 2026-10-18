@@ -10,7 +10,8 @@ import {
   ArrowLeft,
   ChevronRight,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { ReportsService } from '../../services/reportsService';
@@ -32,26 +33,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onBackToLanding
 }) => {
   const { theme, toggleTheme } = useTheme();
-  const [reportCount, setReportCount] = useState<number>(0);
+  const [myReportCount, setMyReportCount] = useState<number>(() => ReportsService.getMyReports().length);
+  const [totalReportCount, setTotalReportCount] = useState<number>(() => ReportsService.getReports().length);
 
-  const updateCount = () => {
-    setReportCount(ReportsService.getReports().length);
+  const updateCounts = () => {
+    setTotalReportCount(ReportsService.getReports().length);
+    setMyReportCount(ReportsService.getMyReports().length);
   };
 
   useEffect(() => {
-    updateCount();
-    const handleUpdate = () => updateCount();
+    updateCounts();
+    ReportsService.fetchMyReports().then(my => setMyReportCount(my.length)).catch(() => {});
+    const handleUpdate = () => updateCounts();
+    const handleMyUpdate = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setMyReportCount(e.detail.length);
+      } else {
+        updateCounts();
+      }
+    };
     window.addEventListener('civicfix_reports_updated', handleUpdate);
+    window.addEventListener('civicfix_my_reports_updated', handleMyUpdate);
+    window.addEventListener('civicfix_auth_updated', handleUpdate);
     return () => {
       window.removeEventListener('civicfix_reports_updated', handleUpdate);
+      window.removeEventListener('civicfix_my_reports_updated', handleMyUpdate);
+      window.removeEventListener('civicfix_auth_updated', handleUpdate);
     };
   }, []);
 
   const mainNavItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'report', label: 'Report Issue', icon: PlusCircle, isAction: true },
-    { id: 'my-reports', label: 'My Reports', icon: ClipboardList, badge: String(reportCount) },
-    { id: 'nearby', label: 'Nearby Issues', icon: MapPin, badge: String(reportCount) },
+    { id: 'my-reports', label: 'My Reports', icon: ClipboardList, badge: String(myReportCount) },
+    { id: 'nearby', label: 'Nearby Issues', icon: MapPin, badge: String(totalReportCount) },
   ];
 
   const bottomNavItems = [
@@ -191,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
 
-        {/* User Profile */}
+        {/* User Profile & Sign Out */}
         <div className="pt-2 border-t border-slate-200 dark:border-slate-800/60 flex items-center justify-between px-2 py-1">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
@@ -202,11 +217,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {currentUser?.name || 'Citizen User'}
               </div>
               <div className="text-[10px] text-slate-400 truncate">
-                {currentUser?.isDemo ? 'Demo Citizen' : 'Verified Citizen'}
+                {currentUser?.email || (currentUser?.isDemo ? 'Demo Citizen' : 'Verified Citizen')}
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+          <button
+            onClick={() => AuthService.clearUser()}
+            title="Sign out / Switch account"
+            aria-label="Sign out"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </aside>

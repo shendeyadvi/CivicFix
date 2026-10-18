@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -25,6 +25,18 @@ export const AppContent: React.FC = () => {
   const [view, setView] = useState<'landing' | 'dashboard'>('landing');
   const [userRole, setUserRole] = useState<'citizen' | 'official'>('citizen');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => AuthService.getCurrentUser());
+
+  useEffect(() => {
+    const handleAuthUpdate = (e: any) => {
+      const user = e.detail as UserProfile | null;
+      setCurrentUser(user);
+      if (!user) {
+        setView('landing');
+      }
+    };
+    window.addEventListener('civicfix_auth_updated', handleAuthUpdate);
+    return () => window.removeEventListener('civicfix_auth_updated', handleAuthUpdate);
+  }, []);
 
   if (view === 'dashboard') {
     return (
